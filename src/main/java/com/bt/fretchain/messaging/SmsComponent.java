@@ -1,6 +1,6 @@
-package com.bt.cloudLibrary.messaging;
+package com.bt.fretchain.messaging;
 
-import com.bt.cloudLibrary.utils.Const;
+import com.bt.fretchain.utils.Const;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.stereotype.Component;

@@ -1,6 +1,6 @@
-package com.bt.cloudLibrary.messaging;
+package com.bt.fretchain.messaging;
 
-import com.bt.cloudLibrary.utils.TextUtils;
+import com.bt.fretchain.utils.TextUtils;
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.auth.oauth2.ServiceAccountCredentials;

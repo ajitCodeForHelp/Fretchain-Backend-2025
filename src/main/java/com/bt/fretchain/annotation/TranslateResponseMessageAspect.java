@@ -1,8 +1,8 @@
 package com.bt.fretchain.annotation;
 
-import com.bt.cloudLibrary.bean.ResponsePacket;
-import com.bt.cloudLibrary.configuration.SpringBeanContext;
-import com.bt.cloudLibrary.configuration.TranslationUtility;
+import com.bt.fretchain.bean.ResponsePacket;
+import com.bt.fretchain.configuration.SpringBeanContext;
+import com.bt.fretchain.configuration.TranslationUtility;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;

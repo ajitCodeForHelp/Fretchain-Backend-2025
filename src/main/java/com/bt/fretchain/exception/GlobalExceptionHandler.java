@@ -1,6 +1,6 @@
-package com.bt.cloudLibrary.exception;
+package com.bt.fretchain.exception;
 
-import com.bt.cloudLibrary.bean.ResponsePacket;
+import com.bt.fretchain.bean.ResponsePacket;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.support.ResourceBundleMessageSource;
@@ -30,8 +30,8 @@ public class GlobalExceptionHandler {
     }
 
     // 400 > Bad Request
-    @ExceptionHandler(BadRequestException.class)
-    public ResponseEntity<?> invalidDataExceptionHandling(Locale locale, BadRequestException e, WebRequest request) {
+    @ExceptionHandler(com.bt.cloudLibrary.exception.BadRequestException.class)
+    public ResponseEntity<?> invalidDataExceptionHandling(Locale locale, com.bt.cloudLibrary.exception.BadRequestException e, WebRequest request) {
         log.debug(e.getMessage());
         String message = e.getMessage();
         if (message.startsWith("cloudLibrary")) {

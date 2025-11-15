@@ -1,4 +1,4 @@
-package com.bt.cloudLibrary.messaging;
+package com.bt.fretchain.messaging;
 
 import com.google.firebase.messaging.Message;
 import lombok.Getter;
