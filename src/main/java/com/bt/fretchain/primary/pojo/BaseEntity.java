@@ -1,4 +1,4 @@
-package com.bt.cloudLibrary.primary.pojo;
+package com.bt.fretchain.primary.pojo;
 
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -15,7 +15,7 @@ import java.util.UUID;
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @Setter
-public abstract class _BasicModel implements Serializable {
+public abstract class BaseEntity implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @Id
@@ -27,7 +27,7 @@ public abstract class _BasicModel implements Serializable {
     protected String uuid;
 
     @Column(name = "active", nullable = false)
-    protected boolean active;
+    protected boolean active = true;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -38,7 +38,13 @@ public abstract class _BasicModel implements Serializable {
     protected LocalDateTime modifiedAt;
 
     @Column(name = "deleted", nullable = false)
-    protected boolean deleted;
+    protected boolean deleted=false;
+
+    @Column(name = "created_by", updatable = false)
+    protected Long createdBy;
+
+    @Column(name = "modified_by")
+    protected Long modifiedBy;
 
     @PrePersist
     public void prePersist() {

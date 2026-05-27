@@ -1,6 +1,6 @@
-package com.bt.cloudLibrary.messaging;
+package com.bt.fretchain.messaging;
 
-import com.bt.cloudLibrary.exception.BadRequestException;
+import com.bt.fretchain.exception.BadRequestException;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 import org.springframework.beans.factory.annotation.Autowired;

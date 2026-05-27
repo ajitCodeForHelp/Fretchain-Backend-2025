@@ -68,24 +68,24 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
         // TODO  >> Need to unComment It
 
-//        if (SecurityContextHolder.getContext().getAuthentication() == null) {
-//            UserDetails userDetails = this.jwtUserDetailsService.loadUserByUsername(userId, userType, userToken);
-//            // UserAdmin userAdmin = this.jwtUserDetailsService.findUserAdmin(username);
-//            if (Boolean.TRUE.equals(jwtTokenUtil.validateToken(jwtToken, userDetails))) {
-//                JwtAuthenticationToken jwtAuthenticationToken = new JwtAuthenticationToken(
-//                        Jwt.withTokenValue(jwtToken)
-//                                .claim("username", username)
-//                                .claim("u-id", userId)
-//                                .claim("u-ty", userType)
-//                                .claim("d-id", deviceId)
-//                                .claim("token", userToken)
-//                                .header(HttpHeaders.AUTHORIZATION, requestTokenHeader)
-//                                .build()
-//                );
-//                jwtAuthenticationToken.setAuthenticated(true);
-//                SecurityContextHolder.getContext().setAuthentication(jwtAuthenticationToken);
-//            }
-//        }
+        if (SecurityContextHolder.getContext().getAuthentication() == null) {
+            UserDetails userDetails = this.jwtUserDetailsService.loadUserByUsername(userId, userType, userToken);
+            // UserAdmin userAdmin = this.jwtUserDetailsService.findUserAdmin(username);
+            if (Boolean.TRUE.equals(jwtTokenUtil.validateToken(jwtToken, userDetails))) {
+                JwtAuthenticationToken jwtAuthenticationToken = new JwtAuthenticationToken(
+                        Jwt.withTokenValue(jwtToken)
+                                .claim("username", username)
+                                .claim("u-id", userId)
+                                .claim("u-ty", userType)
+                                .claim("d-id", deviceId)
+                                .claim("token", userToken)
+                                .header(HttpHeaders.AUTHORIZATION, requestTokenHeader)
+                                .build()
+                );
+                jwtAuthenticationToken.setAuthenticated(true);
+                SecurityContextHolder.getContext().setAuthentication(jwtAuthenticationToken);
+            }
+        }
         filterChain.doFilter(request, response);
     }
 

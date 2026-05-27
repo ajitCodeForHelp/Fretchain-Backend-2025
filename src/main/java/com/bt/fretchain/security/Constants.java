@@ -6,7 +6,7 @@ public class Constants {
     public static final String[] PERMIT_ALL_PATTERNS = new String[]{
             "/auth/**",
             "/public/**",
-            "/guest/**",
+                "/guest/**",
             "/guest-customer/**",
             "/",
 

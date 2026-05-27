@@ -1,46 +1,70 @@
 package com.bt.fretchain.exception;
 
-import com.bt.fretchain.bean.ResponsePacket;
+import com.bt.fretchain.bean.ResponseData;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.support.ResourceBundleMessageSource;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.context.request.WebRequest;
-
-import java.util.Locale;
 
 @Slf4j
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
-    @Autowired private ResourceBundleMessageSource messageSource;
+    // =========================
+    // 400 BAD REQUEST
+    // =========================
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<ResponseData> handleBadRequest(BadRequestException e) {
 
-    // 500 > Internal Server Error
+        return ResponseEntity.ok(
+                ResponseData.builder()
+                        .statusCode(400)
+                        .message(e.getMessage()) // KEY
+                        .build()
+        );
+    }
+
+    // =========================
+    // 404 NOT FOUND
+    // =========================
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ResponseData> handleNotFound(ResourceNotFoundException e) {
+
+        return ResponseEntity.ok(
+                ResponseData.builder()
+                        .statusCode(404)
+                        .message(e.getMessage())
+                        .build()
+        );
+    }
+
+    // =========================
+    // 409 DUPLICATE
+    // =========================
+    @ExceptionHandler(DuplicateResourceException.class)
+    public ResponseEntity<ResponseData> handleDuplicate(DuplicateResourceException e) {
+
+        return ResponseEntity.ok(
+                ResponseData.builder()
+                        .statusCode(409)
+                        .message(e.getMessage())
+                        .build()
+        );
+    }
+
+    // =========================
+    // 500 GLOBAL ERROR
+    // =========================
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<?> globalExceptionHandling(Exception e, WebRequest request) {
-        log.error(e.getMessage());
-        e.printStackTrace();
-        return new ResponseEntity<>(ResponsePacket.builder()
-                .errorCode(1)
-                .message(e.getMessage())
-                .build(), HttpStatus.OK);
-    }
+    public ResponseEntity<ResponseData> handleGeneric(Exception e) {
 
-    // 400 > Bad Request
-    @ExceptionHandler(com.bt.cloudLibrary.exception.BadRequestException.class)
-    public ResponseEntity<?> invalidDataExceptionHandling(Locale locale, com.bt.cloudLibrary.exception.BadRequestException e, WebRequest request) {
-        log.debug(e.getMessage());
-        String message = e.getMessage();
-        if (message.startsWith("cloudLibrary")) {
-            message = messageSource.getMessage(e.getMessage(), null, locale);
-        }
-        return new ResponseEntity<>(ResponsePacket.builder()
-                .errorCode(1)
-                .message(message)
-                .build(), HttpStatus.OK);
-    }
+        log.error("Unexpected error", e);
 
+        return ResponseEntity.ok(
+                ResponseData.builder()
+                        .statusCode(500)
+                        .message("something.went.wrong")
+                        .build()
+        );
+    }
 }

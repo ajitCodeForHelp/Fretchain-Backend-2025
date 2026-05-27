@@ -9,14 +9,14 @@ import lombok.Setter;
 @Getter
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class ResponsePacket<T> {
-    private int errorCode;
+public class ResponseData<T> {
+    private int statusCode;
     private String message;
-    private T responsePacket;
+    private T data;
 
-    public ResponsePacket(int errorCode, String message, T responsePacket) {
-        this.errorCode = errorCode;
+    public ResponseData(int statusCode, String message, T data) {
+        this.statusCode = statusCode;
         this.message = message;
-        this.responsePacket = responsePacket;
+        this.data = data;
     }
 }

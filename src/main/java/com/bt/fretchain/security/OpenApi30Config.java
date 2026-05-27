@@ -11,7 +11,7 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class OpenApi30Config {
-    private final String moduleName="Cloud Library";
+    private final String moduleName="FretChain";
     private final String apiVersion="2.0";
 
 //    public OpenApi30Config(
