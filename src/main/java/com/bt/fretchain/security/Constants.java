@@ -28,7 +28,10 @@ public class Constants {
             "/onboarding/**",
             "/contactUsOrQuoteRequestMail/**",
             "/kafka/**",
-            "/actuator/**"
+            "/actuator/**",
+            "/customer/api/auth/**",
+            "/customer/api/home/**",
+            "/admin/api/auth/**"
     };
     public static final String[] MONITORING_PATTERNS = new String[]{"/actuator1/**"};
     public static final String[] PROTECTED_PATTERNS = new String[]{"/admin/**", "/customer/**"  ,"/ops/**"};

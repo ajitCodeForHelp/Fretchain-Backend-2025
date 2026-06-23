@@ -1,16 +1,21 @@
 package com.bt.fretchain.primary.pojo;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
 @Entity
-@Table(name = "addresses")
+@Table(name = "customer_addresses")
 @Getter
 @Setter
 public class Address extends BaseEntity {
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_id", nullable = false)
+    private SystemUser customer;
+
+    @Column(name = "address_type", length = 50)
+    private String addressType; // HOME, OFFICE, WAREHOUSE, PORT, OTHER
 
     @Column(name = "address_name", length = 100)
     private String addressName;
@@ -32,4 +37,7 @@ public class Address extends BaseEntity {
 
     @Column(name = "longitude")
     private Double longitude;
+
+    @Column(name = "default_address")
+    private Boolean defaultAddress = false;
 }

@@ -21,11 +21,11 @@ public class DriverDocument extends BaseEntity {
     @JoinColumn(name = "driver_id", nullable = false, unique = true)
     private Driver driver;
 
-    @Column(name = "aadhaar_number", length = 30)
-    private String aadhaarNumber;
+    @Column(name = "identity_number", length = 50)
+    private String identityNumber;
 
-    @Column(name = "aadhaar_image_url", length = 500)
-    private String aadhaarImageUrl;
+    @Column(name = "identity_document_url", length = 500)
+    private String identityDocumentUrl;
 
     @Column(name = "license_image_url", length = 500)
     private String licenseImageUrl;
@@ -38,6 +38,9 @@ public class DriverDocument extends BaseEntity {
 
     @Column(name = "contract_document_url", length = 500)
     private String contractDocumentUrl;
+
+    @Column(name = "medical_certificate_url", length = 500)
+    private String medicalCertificateUrl;
 
     @Column(name = "license_validity")
     private LocalDate licenseValidity;

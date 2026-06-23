@@ -1,7 +1,6 @@
 package com.bt.fretchain.primary.controller;
 
 import com.bt.fretchain.exception.BadRequestException;
-import com.bt.fretchain.annotation.TranslateResponseMessage;
 import com.bt.fretchain.bean.ResponseData;
 import com.bt.fretchain.utils.Const;
 import org.springframework.http.HttpStatus;
@@ -13,7 +12,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class UrlController {
 
-    @TranslateResponseMessage
     @GetMapping(value = "/pages/{pageName}")
     public ResponseEntity<ResponseData> pages(@PathVariable String pageName) throws BadRequestException {
         String htmlContent = "";

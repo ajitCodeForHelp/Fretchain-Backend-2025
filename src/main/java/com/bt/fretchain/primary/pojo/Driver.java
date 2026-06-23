@@ -15,7 +15,8 @@ import java.time.LocalDateTime;
         indexes = {
                 @Index(name = "idx_driver_mobile", columnList = "mobile"),
                 @Index(name = "idx_driver_available", columnList = "available"),
-                @Index(name = "idx_driver_username", columnList = "username")
+                @Index(name = "idx_driver_username", columnList = "username"),
+                @Index(name = "idx_driver_vendor", columnList = "vendor_id")
         }
 )
 @Getter
@@ -27,6 +28,9 @@ public class Driver extends BaseEntity {
 
     @Column(name = "mobile", nullable = false, unique = true, length = 20)
     private String mobile;
+
+    @Column(name = "country_code", length = 10)
+    private String countryCode; // +91, +237, +27
 
     @Column(name = "email", length = 120)
     private String email;
@@ -53,11 +57,17 @@ public class Driver extends BaseEntity {
     @Column(name = "license_expiry_date")
     private LocalDate licenseExpiryDate;
 
+    @Column(name = "national_id_number", length = 100)
+    private String nationalIdNumber;
+
     @Column(name = "verified")
     private Boolean verified = false;
 
     @Column(name = "available")
     private Boolean available = true;
+
+    @Column(name = "online_status")
+    private Boolean onlineStatus = false;
 
     @Column(name = "overall_rating", precision = 2, scale = 1)
     private BigDecimal overallRating = BigDecimal.ZERO;
@@ -77,6 +87,9 @@ public class Driver extends BaseEntity {
     @Column(name = "current_longitude")
     private Double currentLng;
 
+    @Column(name = "last_location_updated_at")
+    private LocalDateTime lastLocationUpdatedAt;
+
     @Column(name = "joining_date")
     private LocalDateTime joiningDate;
 
@@ -85,8 +98,8 @@ public class Driver extends BaseEntity {
     private SystemUser vendor;
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "truck_id")
-    private Truck truck;
+    @JoinColumn(name = "vehicle_id")
+    private Vehicle vehicle;
 
     @OneToOne(
             mappedBy = "driver",

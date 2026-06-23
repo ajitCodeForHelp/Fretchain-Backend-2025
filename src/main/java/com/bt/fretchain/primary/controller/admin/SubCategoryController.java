@@ -1,6 +1,5 @@
 package com.bt.fretchain.primary.controller.admin;
 
-import com.bt.fretchain.annotation.TranslateResponseMessage;
 import com.bt.fretchain.bean.DataTableResponsePacket;
 import com.bt.fretchain.bean.KeyValueDto;
 import com.bt.fretchain.bean.ResponseData;
@@ -23,7 +22,6 @@ public class SubCategoryController
 
     private final SubCategoryService subCategoryService;
 
-    @TranslateResponseMessage
     @PostMapping("/save")
     public ResponseEntity<ResponseData> save(
             @Valid @RequestBody
@@ -46,7 +44,6 @@ public class SubCategoryController
         );
     }
 
-    @TranslateResponseMessage
     @PutMapping("/{uuid}")
     public ResponseEntity<ResponseData> update(
             @PathVariable String uuid,
@@ -71,7 +68,6 @@ public class SubCategoryController
         );
     }
 
-    @TranslateResponseMessage
     @GetMapping("/{uuid}")
     public ResponseEntity<ResponseData> getById(
             @PathVariable String uuid
@@ -88,7 +84,6 @@ public class SubCategoryController
         );
     }
 
-    @TranslateResponseMessage
     @PostMapping("/list")
     public ResponseEntity<ResponseData> list(
             @RequestBody
@@ -108,7 +103,6 @@ public class SubCategoryController
         );
     }
 
-    @TranslateResponseMessage
     @PatchMapping("/{uuid}/status")
     public ResponseEntity<ResponseData> updateStatus(
             @PathVariable String uuid,
@@ -131,7 +125,6 @@ public class SubCategoryController
         );
     }
 
-    @TranslateResponseMessage
     @GetMapping("/list-in-key-value")
     public ResponseEntity<ResponseData> listInKeyValue(@RequestHeader(value = "Accept-Language", defaultValue = "en") String lang) {
 

@@ -20,4 +20,5 @@ public interface CategoryRepository extends
     Optional<Category> findByNameFrIgnoreCaseAndDeletedFalse(String nameFr);
 
     List<Category> findByActiveTrueAndDeletedFalseOrderByNameEnAsc();
+    List<Category> findByActiveTrueAndDeletedFalseOrderByCreatedAtDesc();
 }

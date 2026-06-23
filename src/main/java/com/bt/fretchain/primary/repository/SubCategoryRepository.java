@@ -23,4 +23,9 @@ public interface SubCategoryRepository extends
 
     List<SubCategory>
     findByActiveTrueAndDeletedFalseOrderByNameEnAsc();
+
+    List<SubCategory>
+    findByCategoryUuidAndActiveTrueAndDeletedFalse(
+            String categoryUuid
+    );
 }

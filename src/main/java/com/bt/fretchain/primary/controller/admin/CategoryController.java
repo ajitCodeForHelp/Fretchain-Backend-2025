@@ -1,6 +1,5 @@
 package com.bt.fretchain.primary.controller.admin;
 
-import com.bt.fretchain.annotation.TranslateResponseMessage;
 import com.bt.fretchain.bean.DataTableResponsePacket;
 import com.bt.fretchain.bean.KeyValueDto;
 import com.bt.fretchain.bean.ResponseData;
@@ -22,7 +21,6 @@ public class CategoryController extends _BaseController {
 
     private final CategoryService categoryService;
 
-    @TranslateResponseMessage
     @PostMapping("/save")
     public ResponseEntity<ResponseData> save(
             @Valid @RequestBody CategoryDTO.SaveOrUpdate request
@@ -41,7 +39,6 @@ public class CategoryController extends _BaseController {
                         .build()
         );
     }
-    @TranslateResponseMessage
     @PutMapping("/{uuid}")
     public ResponseEntity<ResponseData> update(
             @PathVariable String uuid,
@@ -65,7 +62,6 @@ public class CategoryController extends _BaseController {
                         .build()
         );
     }
-    @TranslateResponseMessage
     @GetMapping("/{uuid}")
     public ResponseEntity<ResponseData> getById(
             @PathVariable String uuid
@@ -82,7 +78,6 @@ public class CategoryController extends _BaseController {
                         .build()
         );
     }
-    @TranslateResponseMessage
     @PostMapping("/list")
     public ResponseEntity<ResponseData> list(
             @Valid @RequestBody CategoryDTO.ListOrSearchData request
@@ -101,7 +96,6 @@ public class CategoryController extends _BaseController {
         );
     }
 
-    @TranslateResponseMessage
     @PatchMapping("/{uuid}/status")
     public ResponseEntity<ResponseData> updateStatus(
             @PathVariable String uuid,
@@ -124,7 +118,6 @@ public class CategoryController extends _BaseController {
         );
     }
 
-    @TranslateResponseMessage
     @GetMapping("/list-in-key-value")
     public ResponseEntity<ResponseData> listInKeyValue(@RequestHeader(value = "Accept-Language", defaultValue = "en") String lang) {
 
