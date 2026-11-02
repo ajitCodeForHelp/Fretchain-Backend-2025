@@ -11,7 +11,8 @@ import lombok.Setter;
     name = "shop_category",
     indexes = {
         @Index(name = "idx_shop_category_shop", columnList = "shop_id"),
-        @Index(name = "idx_shop_category_name", columnList = "name_en")
+        @Index(name = "idx_shop_category_name", columnList = "name_en"),
+        @Index(name = "idx_shop_category_gcat", columnList = "global_category_id")
     }
 )
 public class ShopCategory extends BaseEntity {
@@ -37,4 +38,13 @@ public class ShopCategory extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "shop_id", nullable = false)
     private ShopMaster shop;
+
+    /**
+     * Optional link to one of the shop's global categories
+     * (e.g. shop section "Fresh Fruits" -> global "Grocery").
+     * Must be one of {@link ShopMaster#getGlobalCategories()}.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "global_category_id")
+    private ShopGlobalCategory globalCategory;
 }

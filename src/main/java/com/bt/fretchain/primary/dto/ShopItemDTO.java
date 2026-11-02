@@ -1,6 +1,7 @@
 package com.bt.fretchain.primary.dto;
 
 import jakarta.validation.constraints.*;
+import com.bt.fretchain.primary.pojo.enums.FoodType;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -47,6 +48,16 @@ public class ShopItemDTO {
 
         private String imageUrl;
 
+        /** VEG / NON_VEG / EGG (restaurant items). */
+        private FoodType foodType;
+
+        /** Comma separated keywords, e.g. "atta,flour,wheat". */
+        @Size(max = 500)
+        private String searchTags;
+
+        @Min(0)
+        private Integer preparationMinutes;
+
         private Boolean available = true;
         private Boolean featured = false;
 
@@ -79,6 +90,9 @@ public class ShopItemDTO {
         private String brand;
         private BigDecimal weightKg;
         private String imageUrl;
+        private FoodType foodType;
+        private String searchTags;
+        private Integer preparationMinutes;
         private Boolean available;
         private Boolean featured;
         private Integer displayOrder;

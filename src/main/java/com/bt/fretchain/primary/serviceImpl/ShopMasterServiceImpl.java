@@ -2,17 +2,27 @@ package com.bt.fretchain.primary.serviceImpl;
 
 import com.bt.fretchain.bean.DataTableResponsePacket;
 import com.bt.fretchain.bean.KeyValueDto;
+import com.bt.fretchain.exception.BadRequestException;
 import com.bt.fretchain.exception.DuplicateResourceException;
 import com.bt.fretchain.exception.ResourceNotFoundException;
 import com.bt.fretchain.primary.dto.ShopMasterDTO;
 import com.bt.fretchain.primary.mapper.ShopMasterMapper;
+import com.bt.fretchain.primary.pojo.ShopCategory;
+import com.bt.fretchain.primary.pojo.ShopGlobalCategory;
 import com.bt.fretchain.primary.pojo.ShopMaster;
 import com.bt.fretchain.primary.pojo.SystemUser;
+import com.bt.fretchain.primary.pojo.enums.BusinessType;
+import com.bt.fretchain.primary.pojo.enums.ShopStatus;
+import com.bt.fretchain.primary.repository.ShopCategoryRepository;
+import com.bt.fretchain.primary.repository.ShopGlobalCategoryRepository;
 import com.bt.fretchain.primary.repository.ShopMasterRepository;
 import com.bt.fretchain.primary.repository.SystemUserRepository;
 import com.bt.fretchain.primary.service.ShopMasterService;
 import com.bt.fretchain.utils.PaginationUtils;
+import com.bt.fretchain.utils.SearchUtils;
+import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Subquery;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -20,10 +30,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.math.BigDecimal;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -32,15 +43,23 @@ public class ShopMasterServiceImpl implements ShopMasterService {
     private final ShopMasterRepository repository;
     private final ShopMasterMapper mapper;
     private final SystemUserRepository userRepository;
+    private final ShopGlobalCategoryRepository globalCategoryRepository;
+    private final ShopCategoryRepository shopCategoryRepository;
 
     @Override
+    @Transactional
     public ShopMasterDTO.Detail save(
             ShopMasterDTO.SaveOrUpdate request,
             SystemUser user) {
 
         validateShopCode(request.getShopCode(), null);
+        validateTimings(request);
 
         ShopMaster entity = mapper.toEntity(request);
+        applyDefaults(entity, ShopStatus.PENDING);
+
+        entity.setGlobalCategories(resolveGlobalCategories(
+                request.getGlobalCategoryUuids(), request.getBusinessType()));
 
         if (request.getOwnerUuid() != null
                 && !request.getOwnerUuid().isBlank()) {
@@ -57,6 +76,7 @@ public class ShopMasterServiceImpl implements ShopMasterService {
     }
 
     @Override
+    @Transactional
     public ShopMasterDTO.Detail update(
             String uuid,
             ShopMasterDTO.SaveOrUpdate request,
@@ -67,8 +87,21 @@ public class ShopMasterServiceImpl implements ShopMasterService {
                         new ResourceNotFoundException("record.notfound"));
 
         validateShopCode(request.getShopCode(), entity.getRecordId());
+        validateTimings(request);
+
+        ShopStatus previousStatus = entity.getStatus();
 
         mapper.updateEntityFromDto(request, entity);
+        applyDefaults(entity, previousStatus);
+
+        Set<ShopGlobalCategory> globalCategories = resolveGlobalCategories(
+                request.getGlobalCategoryUuids(), request.getBusinessType());
+
+        // Replace contents (keeps the Hibernate-managed collection instance)
+        entity.getGlobalCategories().clear();
+        entity.getGlobalCategories().addAll(globalCategories);
+
+        unlinkRemovedGlobalCategories(entity, globalCategories, user);
 
         if (request.getOwnerUuid() != null
                 && !request.getOwnerUuid().isBlank()) {
@@ -93,12 +126,13 @@ public class ShopMasterServiceImpl implements ShopMasterService {
     }
 
     @Override
+    @Transactional
     public void updateStatus(String uuid, Boolean active, SystemUser user) {
         ShopMaster entity = repository.findByUuidAndDeletedFalse(uuid)
                 .orElseThrow(() ->
                         new ResourceNotFoundException("record.notfound"));
 
-        entity.setActive(active);
+        entity.setActive(Boolean.TRUE.equals(active));
         entity.setModifiedBy(user.getRecordId());
 
         repository.save(entity);
@@ -110,11 +144,101 @@ public class ShopMasterServiceImpl implements ShopMasterService {
                 .stream()
                 .map(shop -> new KeyValueDto(
                         shop.getUuid(),
-                        "fr".equalsIgnoreCase(lang)
+                        "fr".equalsIgnoreCase(lang) && shop.getNameFr() != null
                                 ? shop.getNameFr()
                                 : shop.getNameEn()
                 ))
                 .toList();
+    }
+
+    // ------------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------------
+
+    /**
+     * All requested global categories must exist, be active and belong to the
+     * same business type as the store (no "Pizza" on a grocery shop).
+     */
+    private Set<ShopGlobalCategory> resolveGlobalCategories(
+            List<String> uuids, BusinessType businessType) {
+
+        Set<String> distinct = uuids == null ? Set.of() : uuids.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        if (distinct.isEmpty()) {
+            throw new BadRequestException("shop.global.category.required");
+        }
+
+        List<ShopGlobalCategory> found =
+                globalCategoryRepository.findByUuidInAndDeletedFalse(distinct);
+
+        if (found.size() != distinct.size()) {
+            throw new ResourceNotFoundException("shop.global.category.notfound");
+        }
+
+        for (ShopGlobalCategory category : found) {
+            if (!category.isActive() || category.getBusinessType() != businessType) {
+                throw new BadRequestException("shop.global.category.invalid");
+            }
+        }
+
+        return new LinkedHashSet<>(found);
+    }
+
+    /**
+     * If a global category is removed from the store, shop sections that pointed
+     * to it lose the link (they still exist, just unmapped).
+     */
+    private void unlinkRemovedGlobalCategories(
+            ShopMaster shop, Set<ShopGlobalCategory> current, SystemUser user) {
+
+        Set<Long> currentIds = current.stream()
+                .map(ShopGlobalCategory::getRecordId)
+                .collect(Collectors.toSet());
+
+        for (ShopCategory section : shopCategoryRepository
+                .findByShop_RecordIdAndGlobalCategoryIsNotNullAndDeletedFalse(
+                        shop.getRecordId())) {
+
+            if (!currentIds.contains(section.getGlobalCategory().getRecordId())) {
+                section.setGlobalCategory(null);
+                section.setModifiedBy(user.getRecordId());
+                shopCategoryRepository.save(section);
+            }
+        }
+    }
+
+    private void applyDefaults(ShopMaster entity, ShopStatus statusIfMissing) {
+        if (entity.getStatus() == null) {
+            entity.setStatus(statusIfMissing == null ? ShopStatus.PENDING : statusIfMissing);
+        }
+        if (entity.getAcceptingOrders() == null) {
+            entity.setAcceptingOrders(true);
+        }
+        if (entity.getCommissionPercentage() == null) {
+            entity.setCommissionPercentage(BigDecimal.ZERO);
+        }
+        if (entity.getBusinessType() != BusinessType.RESTAURANT) {
+            // Restaurant-only attributes are meaningless for shops
+            entity.setFoodType(null);
+            entity.setCostForTwo(null);
+        }
+    }
+
+    private void validateTimings(ShopMasterDTO.SaveOrUpdate request) {
+        boolean onlyOne = (request.getOpeningTime() == null)
+                != (request.getClosingTime() == null);
+
+        if (onlyOne) {
+            throw new BadRequestException("shop.timing.invalid");
+        }
+        if (request.getOpeningTime() != null
+                && request.getOpeningTime().equals(request.getClosingTime())) {
+            throw new BadRequestException("shop.timing.invalid");
+        }
     }
 
     private void validateShopCode(String code, Long currentId) {
@@ -131,6 +255,10 @@ public class ShopMasterServiceImpl implements ShopMasterService {
                     }
                 });
     }
+
+    // ------------------------------------------------------------------
+    // Admin list
+    // ------------------------------------------------------------------
 
     @Override
     public DataTableResponsePacket<ShopMasterDTO.Detail> getListData(
@@ -154,7 +282,8 @@ public class ShopMasterServiceImpl implements ShopMasterService {
 
         Set<String> allowedFields = Set.of(
                 "createdAt", "nameEn", "nameFr",
-                "shopCode", "mobile", "status"
+                "shopCode", "mobile", "status",
+                "businessType", "city", "rating"
         );
 
         String field = "createdAt";
@@ -194,41 +323,56 @@ public class ShopMasterServiceImpl implements ShopMasterService {
 
             predicates.add(cb.isFalse(root.get("deleted")));
 
-            if (request.getSearch() != null
-                    && !request.getSearch().isBlank()) {
-
-                String search = "%"
-                        + request.getSearch().trim().toLowerCase()
-                        + "%";
-
+            String pattern = SearchUtils.containsPattern(request.getSearch());
+            if (pattern != null) {
+                char esc = SearchUtils.LIKE_ESCAPE;
                 predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("nameEn")), search),
-                        cb.like(cb.lower(root.get("nameFr")), search),
-                        cb.like(cb.lower(root.get("shopCode")), search),
-                        cb.like(cb.lower(root.get("mobile")), search),
-                        cb.like(cb.lower(root.get("email")), search)
+                        cb.like(cb.lower(root.get("nameEn")), pattern, esc),
+                        cb.like(cb.lower(root.get("nameFr")), pattern, esc),
+                        cb.like(cb.lower(root.get("shopCode")), pattern, esc),
+                        cb.like(cb.lower(root.get("mobile")), pattern, esc),
+                        cb.like(cb.lower(root.get("email")), pattern, esc)
                 ));
             }
 
-            if (request.getFilters() != null) {
-                if (request.getFilters().getActive() != null) {
-                    predicates.add(cb.equal(
-                            root.get("active"),
-                            request.getFilters().getActive()
-                    ));
+            ShopMasterDTO.FilterData filters = request.getFilters();
+            if (filters != null) {
+                if (filters.getActive() != null) {
+                    predicates.add(cb.equal(root.get("active"), filters.getActive()));
                 }
 
-                if (request.getFilters().getStatus() != null
-                        && !request.getFilters().getStatus().isBlank()) {
+                if (filters.getStatus() != null) {
+                    predicates.add(cb.equal(root.get("status"), filters.getStatus()));
+                }
+
+                if (filters.getBusinessType() != null) {
                     predicates.add(cb.equal(
-                            root.get("status"),
-                            request.getFilters().getStatus().trim()
-                    ));
+                            root.get("businessType"), filters.getBusinessType()));
+                }
+
+                if (filters.getCity() != null && !filters.getCity().isBlank()) {
+                    predicates.add(cb.equal(
+                            cb.lower(root.get("city")),
+                            filters.getCity().trim().toLowerCase(Locale.ROOT)));
+                }
+
+                if (filters.getGlobalCategoryUuid() != null
+                        && !filters.getGlobalCategoryUuid().isBlank()) {
+
+                    // EXISTS sub-query avoids duplicate rows / broken count query
+                    Subquery<Long> sub = query.subquery(Long.class);
+                    var subRoot = sub.from(ShopMaster.class);
+                    Join<ShopMaster, ShopGlobalCategory> g =
+                            subRoot.join("globalCategories");
+                    sub.select(subRoot.get("recordId")).where(
+                            cb.equal(subRoot.get("recordId"), root.get("recordId")),
+                            cb.equal(g.get("uuid"), filters.getGlobalCategoryUuid())
+                    );
+                    predicates.add(cb.exists(sub));
                 }
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));
         };
     }
-
 }

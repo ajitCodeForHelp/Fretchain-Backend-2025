@@ -1,16 +1,20 @@
 package com.bt.fretchain.primary.serviceImpl;
 
 import com.bt.fretchain.bean.DataTableResponsePacket;
+import com.bt.fretchain.exception.BadRequestException;
+import com.bt.fretchain.exception.DuplicateResourceException;
 import com.bt.fretchain.exception.ResourceNotFoundException;
 import com.bt.fretchain.primary.dto.ShopCategoryDTO;
 import com.bt.fretchain.primary.mapper.ShopCategoryMapper;
 import com.bt.fretchain.primary.pojo.ShopCategory;
+import com.bt.fretchain.primary.pojo.ShopGlobalCategory;
 import com.bt.fretchain.primary.pojo.ShopMaster;
 import com.bt.fretchain.primary.pojo.SystemUser;
 import com.bt.fretchain.primary.repository.ShopCategoryRepository;
 import com.bt.fretchain.primary.repository.ShopMasterRepository;
 import com.bt.fretchain.primary.service.ShopCategoryService;
 import com.bt.fretchain.utils.PaginationUtils;
+import com.bt.fretchain.utils.SearchUtils;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -19,6 +23,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +38,7 @@ public class ShopCategoryServiceImpl implements ShopCategoryService {
     private final ShopCategoryMapper mapper;
 
     @Override
+    @Transactional
     public ShopCategoryDTO.Detail save(
             ShopCategoryDTO.SaveOrUpdate request,
             SystemUser user) {
@@ -46,6 +52,7 @@ public class ShopCategoryServiceImpl implements ShopCategoryService {
 
         ShopCategory entity = mapper.toEntity(request);
         entity.setShop(shop);
+        entity.setGlobalCategory(resolveGlobalCategory(request, shop));
         entity.setCreatedBy(user.getRecordId());
         entity.setModifiedBy(user.getRecordId());
 
@@ -53,6 +60,7 @@ public class ShopCategoryServiceImpl implements ShopCategoryService {
     }
 
     @Override
+    @Transactional
     public ShopCategoryDTO.Detail update(
             String uuid,
             ShopCategoryDTO.SaveOrUpdate request,
@@ -71,6 +79,7 @@ public class ShopCategoryServiceImpl implements ShopCategoryService {
 
         mapper.updateEntityFromDto(request, entity);
         entity.setShop(shop);
+        entity.setGlobalCategory(resolveGlobalCategory(request, shop));
         entity.setModifiedBy(user.getRecordId());
 
         return mapper.toDetailDto(repository.save(entity));
@@ -101,13 +110,38 @@ public class ShopCategoryServiceImpl implements ShopCategoryService {
             Long shopId,
             Long currentId) {
 
-        if (repository.existsByShop_RecordIdAndNameEnIgnoreCaseAndDeletedFalse(
-                shopId, request.getNameEn().trim())) {
-            // In production, use an exists query excluding currentId
-            // when updating, to avoid treating the current record as duplicate.
+        String name = request.getNameEn().trim();
+
+        boolean exists = currentId == null
+                ? repository.existsByShop_RecordIdAndNameEnIgnoreCaseAndDeletedFalse(
+                        shopId, name)
+                : repository.existsByShop_RecordIdAndNameEnIgnoreCaseAndDeletedFalseAndRecordIdNot(
+                        shopId, name, currentId);
+
+        if (exists) {
+            throw new DuplicateResourceException("shop.category.name.exists");
         }
     }
 
+    /**
+     * Optional link of a shop section to a global category. The global category
+     * must be one the shop is assigned to (keeps customer filtering consistent).
+     */
+    private ShopGlobalCategory resolveGlobalCategory(
+            ShopCategoryDTO.SaveOrUpdate request, ShopMaster shop) {
+
+        if (request.getGlobalCategoryUuid() == null
+                || request.getGlobalCategoryUuid().isBlank()) {
+            return null;
+        }
+
+        return shop.getGlobalCategories().stream()
+                .filter(g -> !g.isDeleted()
+                        && g.getUuid().equals(request.getGlobalCategoryUuid().trim()))
+                .findFirst()
+                .orElseThrow(() ->
+                        new BadRequestException("shop.global.category.notassigned"));
+    }
 
     @Override
     public DataTableResponsePacket<ShopCategoryDTO.Detail> getListData(
@@ -170,13 +204,12 @@ public class ShopCategoryServiceImpl implements ShopCategoryService {
             if (request.getSearch() != null
                     && !request.getSearch().isBlank()) {
 
-                String search = "%"
-                        + request.getSearch().trim().toLowerCase()
-                        + "%";
+                String search = SearchUtils.containsPattern(request.getSearch());
+                char esc = SearchUtils.LIKE_ESCAPE;
 
                 predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("nameEn")), search),
-                        cb.like(cb.lower(root.get("nameFr")), search)
+                        cb.like(cb.lower(root.get("nameEn")), search, esc),
+                        cb.like(cb.lower(root.get("nameFr")), search, esc)
                 ));
             }
 

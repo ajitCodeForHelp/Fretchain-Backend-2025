@@ -40,4 +40,40 @@ public interface ShopItemRepository
     boolean existsByShop_RecordIdAndSkuIgnoreCaseAndDeletedFalse(
             Long shopId, String sku
     );
+
+    /**
+     * Customer-visible item counts of a shop, grouped by category and subcategory.
+     * Row = [categoryId (Long), subCategoryId (Long or null), count (Long)].
+     */
+    @Query("""
+        SELECT c.recordId, sc.recordId, COUNT(i)
+        FROM ShopItem i
+        JOIN i.category c
+        LEFT JOIN i.subCategory sc
+        WHERE i.shop.recordId = :shopId
+          AND i.active = true
+          AND i.deleted = false
+          AND i.available = true
+          AND c.active = true
+          AND c.deleted = false
+          AND (sc IS NULL OR (sc.active = true AND sc.deleted = false))
+        GROUP BY c.recordId, sc.recordId
+        """)
+    List<Object[]> countVisibleItemsByCategory(@Param("shopId") Long shopId);
+
+    /** Full customer menu of a shop (restaurants). */
+    @Query("""
+        SELECT i FROM ShopItem i
+        JOIN FETCH i.category c
+        LEFT JOIN FETCH i.subCategory sc
+        WHERE i.shop.recordId = :shopId
+          AND i.active = true
+          AND i.deleted = false
+          AND i.available = true
+          AND c.active = true
+          AND c.deleted = false
+          AND (sc IS NULL OR (sc.active = true AND sc.deleted = false))
+        ORDER BY i.featured DESC, i.displayOrder ASC, i.nameEn ASC
+        """)
+    List<ShopItem> findVisibleMenuItems(@Param("shopId") Long shopId);
 }

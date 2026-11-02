@@ -17,6 +17,15 @@ public interface ShopCategoryRepository
             Long shopId, String nameEn
     );
 
+    boolean existsByShop_RecordIdAndNameEnIgnoreCaseAndDeletedFalseAndRecordIdNot(
+            Long shopId, String nameEn, Long recordId
+    );
+
+    /** Shop sections linked to a global category (used when the shop's global categories change). */
+    List<ShopCategory> findByShop_RecordIdAndGlobalCategoryIsNotNullAndDeletedFalse(
+            Long shopId
+    );
+
     boolean existsByShop_RecordIdAndNameFrIgnoreCaseAndDeletedFalse(
             Long shopId, String nameFr
     );
@@ -31,4 +40,14 @@ public interface ShopCategoryRepository
     List<ShopCategory> findActiveByShopUuid(
             @Param("shopUuid") String shopUuid
     );
+
+    @Query("""
+        SELECT c FROM ShopCategory c
+        LEFT JOIN FETCH c.globalCategory
+        WHERE c.shop.recordId = :shopId
+          AND c.active = true
+          AND c.deleted = false
+        ORDER BY c.displayOrder ASC, c.nameEn ASC
+        """)
+    List<ShopCategory> findActiveByShopId(@Param("shopId") Long shopId);
 }

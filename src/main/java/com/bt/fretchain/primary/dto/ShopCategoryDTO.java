@@ -27,6 +27,9 @@ public class ShopCategoryDTO {
 
         @NotBlank
         private String shopUuid;
+
+        /** Optional. Must be one of the shop's assigned global categories. */
+        private String globalCategoryUuid;
     }
 
     @Getter
@@ -41,6 +44,8 @@ public class ShopCategoryDTO {
         private Integer displayOrder;
         private String shopUuid;
         private String shopName;
+        private String globalCategoryUuid;
+        private String globalCategoryName;
         private Boolean active;
         private Boolean deleted;
     }

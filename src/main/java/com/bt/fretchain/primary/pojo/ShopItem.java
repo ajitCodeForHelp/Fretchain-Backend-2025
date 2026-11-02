@@ -1,5 +1,6 @@
 package com.bt.fretchain.primary.pojo;
 
+import com.bt.fretchain.primary.pojo.enums.FoodType;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -15,7 +16,8 @@ import java.math.BigDecimal;
         @Index(name = "idx_shop_item_shop", columnList = "shop_id"),
         @Index(name = "idx_shop_item_category", columnList = "category_id"),
         @Index(name = "idx_shop_item_subcategory", columnList = "subcategory_id"),
-        @Index(name = "idx_shop_item_sku", columnList = "sku")
+        @Index(name = "idx_shop_item_sku", columnList = "sku"),
+        @Index(name = "idx_shop_item_name", columnList = "name_en")
     }
 )
 public class ShopItem extends BaseEntity {
@@ -58,6 +60,22 @@ public class ShopItem extends BaseEntity {
 
     @Column(name = "image_url", length = 500)
     private String imageUrl;
+
+    /** VEG / NON_VEG / EGG - mainly for restaurant items, null for others. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "food_type", length = 20)
+    private FoodType foodType;
+
+    /**
+     * Comma separated search keywords / synonyms, e.g. "atta,flour,wheat".
+     * Matched by customer search together with name, brand and category names.
+     */
+    @Column(name = "search_tags", length = 500)
+    private String searchTags;
+
+    /** Restaurant: preparation time for this dish (optional). */
+    @Column(name = "preparation_minutes")
+    private Integer preparationMinutes;
 
     @Column(nullable = false)
     private Boolean available = true;
