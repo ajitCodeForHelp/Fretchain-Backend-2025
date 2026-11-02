@@ -1,8 +1,6 @@
 package com.bt.fretchain.primary.dto;
 
 import com.bt.fretchain.bean.KeyValueDto;
-import com.bt.fretchain.primary.pojo.enums.BusinessType;
-import com.bt.fretchain.primary.pojo.enums.FoodType;
 import com.bt.fretchain.primary.pojo.enums.ShopStatus;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
@@ -22,14 +20,7 @@ public class ShopMasterDTO {
         @Size(max = 50)
         private String shopCode;
 
-        /** SHOP or RESTAURANT. */
-        @NotNull
-        private BusinessType businessType;
-
-        /**
-         * Global categories to assign (at least one). All must have the same
-         * businessType as the store. e.g. ["<grocery-uuid>", "<bakery-uuid>"].
-         */
+        /** Global categories to assign (at least one), e.g. ["<grocery-uuid>", "<bakery-uuid>"]. */
         @NotEmpty
         private List<String> globalCategoryUuids = new ArrayList<>();
 
@@ -92,13 +83,6 @@ public class ShopMasterDTO {
         @DecimalMax("100.0")
         private BigDecimal commissionPercentage;
 
-        /** Restaurant only: VEG (pure veg) or BOTH. */
-        private FoodType foodType;
-
-        /** Restaurant only. */
-        @DecimalMin("0.0")
-        private BigDecimal costForTwo;
-
         /** Defaults to PENDING on create when not supplied. */
         private ShopStatus status;
 
@@ -111,7 +95,6 @@ public class ShopMasterDTO {
     public static class Detail {
         private String uuid;
         private String shopCode;
-        private BusinessType businessType;
         private List<KeyValueDto> globalCategories;
         private String nameEn;
         private String nameFr;
@@ -137,8 +120,6 @@ public class ShopMasterDTO {
         private BigDecimal minOrderAmount;
         private BigDecimal deliveryFee;
         private BigDecimal commissionPercentage;
-        private FoodType foodType;
-        private BigDecimal costForTwo;
         private BigDecimal rating;
         private Integer ratingCount;
         private ShopStatus status;
@@ -170,7 +151,6 @@ public class ShopMasterDTO {
     public static class FilterData {
         private Boolean active;
         private ShopStatus status;
-        private BusinessType businessType;
         private String globalCategoryUuid;
         private String city;
     }

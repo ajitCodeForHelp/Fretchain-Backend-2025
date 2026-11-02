@@ -8,7 +8,6 @@ import com.bt.fretchain.primary.dto.ShopGlobalCategoryDTO;
 import com.bt.fretchain.primary.mapper.ShopGlobalCategoryMapper;
 import com.bt.fretchain.primary.pojo.ShopGlobalCategory;
 import com.bt.fretchain.primary.pojo.SystemUser;
-import com.bt.fretchain.primary.pojo.enums.BusinessType;
 import com.bt.fretchain.primary.repository.ShopGlobalCategoryRepository;
 import com.bt.fretchain.primary.service.ShopGlobalCategoryService;
 import com.bt.fretchain.utils.PaginationUtils;
@@ -98,10 +97,9 @@ public class ShopGlobalCategoryServiceImpl implements ShopGlobalCategoryService 
     }
 
     @Override
-    public List<KeyValueDto> getKeyValueList(BusinessType businessType, String lang) {
+    public List<KeyValueDto> getKeyValueList(String lang) {
         return repository
-                .findByBusinessTypeAndActiveTrueAndDeletedFalseOrderByDisplayOrderAscNameEnAsc(
-                        businessType)
+                .findByActiveTrueAndDeletedFalseOrderByDisplayOrderAscNameEnAsc()
                 .stream()
                 .map(c -> new KeyValueDto(
                         c.getUuid(),
@@ -117,10 +115,9 @@ public class ShopGlobalCategoryServiceImpl implements ShopGlobalCategoryService 
         String name = request.getNameEn().trim();
 
         boolean exists = currentId == null
-                ? repository.existsByBusinessTypeAndNameEnIgnoreCaseAndDeletedFalse(
-                        request.getBusinessType(), name)
-                : repository.existsByBusinessTypeAndNameEnIgnoreCaseAndDeletedFalseAndRecordIdNot(
-                        request.getBusinessType(), name, currentId);
+                ? repository.existsByNameEnIgnoreCaseAndDeletedFalse(name)
+                : repository.existsByNameEnIgnoreCaseAndDeletedFalseAndRecordIdNot(
+                        name, currentId);
 
         if (exists) {
             throw new DuplicateResourceException("shop.global.category.name.exists");
@@ -141,7 +138,7 @@ public class ShopGlobalCategoryServiceImpl implements ShopGlobalCategoryService 
             ShopGlobalCategoryDTO.ListOrSearchData request) {
 
         Set<String> allowedFields = Set.of(
-                "createdAt", "nameEn", "nameFr", "displayOrder", "businessType"
+                "createdAt", "nameEn", "nameFr", "displayOrder"
         );
 
         String field = "displayOrder";
@@ -179,11 +176,6 @@ public class ShopGlobalCategoryServiceImpl implements ShopGlobalCategoryService 
                         cb.like(cb.lower(root.get("nameEn")), pattern, SearchUtils.LIKE_ESCAPE),
                         cb.like(cb.lower(root.get("nameFr")), pattern, SearchUtils.LIKE_ESCAPE)
                 ));
-            }
-
-            if (request.getBusinessType() != null) {
-                predicates.add(cb.equal(
-                        root.get("businessType"), request.getBusinessType()));
             }
 
             if (request.getFilters() != null

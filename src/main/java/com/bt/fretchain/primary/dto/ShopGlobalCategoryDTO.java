@@ -1,8 +1,6 @@
 package com.bt.fretchain.primary.dto;
 
-import com.bt.fretchain.primary.pojo.enums.BusinessType;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
@@ -12,9 +10,6 @@ public class ShopGlobalCategoryDTO {
     @Getter
     @Setter
     public static class SaveOrUpdate {
-
-        @NotNull
-        private BusinessType businessType;
 
         @NotBlank
         @Size(max = 150)
@@ -33,7 +28,6 @@ public class ShopGlobalCategoryDTO {
     @Setter
     public static class Detail {
         private String uuid;
-        private BusinessType businessType;
         private String nameEn;
         private String nameFr;
         private String descriptionEn;
@@ -50,7 +44,6 @@ public class ShopGlobalCategoryDTO {
         private Integer pageNumber = 0;
         private Integer pageSize = 10;
         private String search;
-        private BusinessType businessType;
         private SortData sort;
         private FilterData filters;
     }

@@ -60,20 +60,4 @@ public interface ShopItemRepository
         GROUP BY c.recordId, sc.recordId
         """)
     List<Object[]> countVisibleItemsByCategory(@Param("shopId") Long shopId);
-
-    /** Full customer menu of a shop (restaurants). */
-    @Query("""
-        SELECT i FROM ShopItem i
-        JOIN FETCH i.category c
-        LEFT JOIN FETCH i.subCategory sc
-        WHERE i.shop.recordId = :shopId
-          AND i.active = true
-          AND i.deleted = false
-          AND i.available = true
-          AND c.active = true
-          AND c.deleted = false
-          AND (sc IS NULL OR (sc.active = true AND sc.deleted = false))
-        ORDER BY i.featured DESC, i.displayOrder ASC, i.nameEn ASC
-        """)
-    List<ShopItem> findVisibleMenuItems(@Param("shopId") Long shopId);
 }

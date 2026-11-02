@@ -3,17 +3,13 @@ package com.bt.fretchain.primary.controller.admin.Shop;
 import com.bt.fretchain.bean.ResponseData;
 import com.bt.fretchain.primary.controller._BaseController;
 import com.bt.fretchain.primary.dto.ShopGlobalCategoryDTO;
-import com.bt.fretchain.primary.pojo.enums.BusinessType;
 import com.bt.fretchain.primary.service.ShopGlobalCategoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * Admin: platform-level categories used to bifurcate stores
- * (Grocery, Pharmacy... for SHOP; Pizza, Biryani... for RESTAURANT).
- */
+/** Admin: platform-level categories used to bifurcate shops (Grocery, Pharmacy...). */
 @RestController
 @RequestMapping("/admin/api/shop-global-category")
 @RequiredArgsConstructor
@@ -78,17 +74,15 @@ public class ShopGlobalCategoryController extends _BaseController {
                 .build());
     }
 
-    /** e.g. GET /admin/api/shop-global-category/list-in-key-value?businessType=RESTAURANT */
     @GetMapping("/list-in-key-value")
     public ResponseEntity<ResponseData> listInKeyValue(
-            @RequestParam BusinessType businessType,
             @RequestHeader(value = "Accept-Language", defaultValue = "en")
             String lang) {
 
         return ResponseEntity.ok(ResponseData.builder()
                 .statusCode(200)
                 .message("record.dropdown.fetched")
-                .data(service.getKeyValueList(businessType, lang))
+                .data(service.getKeyValueList(lang))
                 .build());
     }
 }

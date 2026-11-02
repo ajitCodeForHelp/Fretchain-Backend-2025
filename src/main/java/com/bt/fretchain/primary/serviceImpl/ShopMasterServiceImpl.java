@@ -11,7 +11,6 @@ import com.bt.fretchain.primary.pojo.ShopCategory;
 import com.bt.fretchain.primary.pojo.ShopGlobalCategory;
 import com.bt.fretchain.primary.pojo.ShopMaster;
 import com.bt.fretchain.primary.pojo.SystemUser;
-import com.bt.fretchain.primary.pojo.enums.BusinessType;
 import com.bt.fretchain.primary.pojo.enums.ShopStatus;
 import com.bt.fretchain.primary.repository.ShopCategoryRepository;
 import com.bt.fretchain.primary.repository.ShopGlobalCategoryRepository;
@@ -59,7 +58,7 @@ public class ShopMasterServiceImpl implements ShopMasterService {
         applyDefaults(entity, ShopStatus.PENDING);
 
         entity.setGlobalCategories(resolveGlobalCategories(
-                request.getGlobalCategoryUuids(), request.getBusinessType()));
+                request.getGlobalCategoryUuids()));
 
         if (request.getOwnerUuid() != null
                 && !request.getOwnerUuid().isBlank()) {
@@ -95,7 +94,7 @@ public class ShopMasterServiceImpl implements ShopMasterService {
         applyDefaults(entity, previousStatus);
 
         Set<ShopGlobalCategory> globalCategories = resolveGlobalCategories(
-                request.getGlobalCategoryUuids(), request.getBusinessType());
+                request.getGlobalCategoryUuids());
 
         // Replace contents (keeps the Hibernate-managed collection instance)
         entity.getGlobalCategories().clear();
@@ -155,12 +154,8 @@ public class ShopMasterServiceImpl implements ShopMasterService {
     // Helpers
     // ------------------------------------------------------------------
 
-    /**
-     * All requested global categories must exist, be active and belong to the
-     * same business type as the store (no "Pizza" on a grocery shop).
-     */
-    private Set<ShopGlobalCategory> resolveGlobalCategories(
-            List<String> uuids, BusinessType businessType) {
+    /** All requested global categories must exist and be active. */
+    private Set<ShopGlobalCategory> resolveGlobalCategories(List<String> uuids) {
 
         Set<String> distinct = uuids == null ? Set.of() : uuids.stream()
                 .filter(Objects::nonNull)
@@ -180,7 +175,7 @@ public class ShopMasterServiceImpl implements ShopMasterService {
         }
 
         for (ShopGlobalCategory category : found) {
-            if (!category.isActive() || category.getBusinessType() != businessType) {
+            if (!category.isActive()) {
                 throw new BadRequestException("shop.global.category.invalid");
             }
         }
@@ -220,11 +215,6 @@ public class ShopMasterServiceImpl implements ShopMasterService {
         }
         if (entity.getCommissionPercentage() == null) {
             entity.setCommissionPercentage(BigDecimal.ZERO);
-        }
-        if (entity.getBusinessType() != BusinessType.RESTAURANT) {
-            // Restaurant-only attributes are meaningless for shops
-            entity.setFoodType(null);
-            entity.setCostForTwo(null);
         }
     }
 
@@ -283,7 +273,7 @@ public class ShopMasterServiceImpl implements ShopMasterService {
         Set<String> allowedFields = Set.of(
                 "createdAt", "nameEn", "nameFr",
                 "shopCode", "mobile", "status",
-                "businessType", "city", "rating"
+                "city", "rating"
         );
 
         String field = "createdAt";
@@ -343,11 +333,6 @@ public class ShopMasterServiceImpl implements ShopMasterService {
 
                 if (filters.getStatus() != null) {
                     predicates.add(cb.equal(root.get("status"), filters.getStatus()));
-                }
-
-                if (filters.getBusinessType() != null) {
-                    predicates.add(cb.equal(
-                            root.get("businessType"), filters.getBusinessType()));
                 }
 
                 if (filters.getCity() != null && !filters.getCity().isBlank()) {
