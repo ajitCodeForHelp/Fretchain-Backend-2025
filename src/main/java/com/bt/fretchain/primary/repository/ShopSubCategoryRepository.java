@@ -28,4 +28,15 @@ public interface ShopSubCategoryRepository
     boolean existsByShop_RecordIdAndCategory_RecordIdAndNameEnIgnoreCaseAndDeletedFalse(
             Long shopId, Long categoryId, String nameEn
     );
+
+    @Query("""
+        SELECT sc FROM ShopSubCategory sc
+        WHERE sc.shop.recordId = :shopId
+          AND sc.active = true
+          AND sc.deleted = false
+          AND sc.category.active = true
+          AND sc.category.deleted = false
+        ORDER BY sc.displayOrder ASC, sc.nameEn ASC
+        """)
+    List<ShopSubCategory> findActiveByShopId(@Param("shopId") Long shopId);
 }

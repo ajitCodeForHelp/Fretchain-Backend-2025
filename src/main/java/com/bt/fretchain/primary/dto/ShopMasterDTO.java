@@ -1,11 +1,17 @@
 package com.bt.fretchain.primary.dto;
 
+import com.bt.fretchain.bean.KeyValueDto;
+import com.bt.fretchain.primary.pojo.enums.BusinessType;
+import com.bt.fretchain.primary.pojo.enums.FoodType;
+import com.bt.fretchain.primary.pojo.enums.ShopStatus;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ShopMasterDTO {
 
@@ -15,6 +21,17 @@ public class ShopMasterDTO {
 
         @Size(max = 50)
         private String shopCode;
+
+        /** SHOP or RESTAURANT. */
+        @NotNull
+        private BusinessType businessType;
+
+        /**
+         * Global categories to assign (at least one). All must have the same
+         * businessType as the store. e.g. ["<grocery-uuid>", "<bakery-uuid>"].
+         */
+        @NotEmpty
+        private List<String> globalCategoryUuids = new ArrayList<>();
 
         @NotBlank
         @Size(max = 150)
@@ -44,22 +61,46 @@ public class ShopMasterDTO {
         private String country;
         private String postalCode;
 
+        @NotNull
         @DecimalMin("-90.0")
         @DecimalMax("90.0")
         private BigDecimal latitude;
 
+        @NotNull
         @DecimalMin("-180.0")
         @DecimalMax("180.0")
         private BigDecimal longitude;
 
+        @DecimalMin("0.0")
+        @DecimalMax("100.0")
+        private BigDecimal deliveryRadiusKm;
+
         private LocalTime openingTime;
         private LocalTime closingTime;
+        private Boolean acceptingOrders;
+
+        @Min(0)
+        private Integer avgPreparationMinutes;
+
+        @DecimalMin("0.0")
+        private BigDecimal minOrderAmount;
+
+        @DecimalMin("0.0")
+        private BigDecimal deliveryFee;
 
         @DecimalMin("0.0")
         @DecimalMax("100.0")
         private BigDecimal commissionPercentage;
 
-        private String status;
+        /** Restaurant only: VEG (pure veg) or BOTH. */
+        private FoodType foodType;
+
+        /** Restaurant only. */
+        @DecimalMin("0.0")
+        private BigDecimal costForTwo;
+
+        /** Defaults to PENDING on create when not supplied. */
+        private ShopStatus status;
 
         // UUID of the shop owner, if assigned
         private String ownerUuid;
@@ -70,6 +111,8 @@ public class ShopMasterDTO {
     public static class Detail {
         private String uuid;
         private String shopCode;
+        private BusinessType businessType;
+        private List<KeyValueDto> globalCategories;
         private String nameEn;
         private String nameFr;
         private String descriptionEn;
@@ -86,10 +129,19 @@ public class ShopMasterDTO {
         private String postalCode;
         private BigDecimal latitude;
         private BigDecimal longitude;
+        private BigDecimal deliveryRadiusKm;
         private LocalTime openingTime;
         private LocalTime closingTime;
+        private Boolean acceptingOrders;
+        private Integer avgPreparationMinutes;
+        private BigDecimal minOrderAmount;
+        private BigDecimal deliveryFee;
         private BigDecimal commissionPercentage;
-        private String status;
+        private FoodType foodType;
+        private BigDecimal costForTwo;
+        private BigDecimal rating;
+        private Integer ratingCount;
+        private ShopStatus status;
         private String ownerUuid;
         private String ownerName;
         private Boolean active;
@@ -117,6 +169,9 @@ public class ShopMasterDTO {
     @Setter
     public static class FilterData {
         private Boolean active;
-        private String status;
+        private ShopStatus status;
+        private BusinessType businessType;
+        private String globalCategoryUuid;
+        private String city;
     }
 }
