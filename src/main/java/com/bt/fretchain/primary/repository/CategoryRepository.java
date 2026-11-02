@@ -21,4 +21,7 @@ public interface CategoryRepository extends
 
     List<Category> findByActiveTrueAndDeletedFalseOrderByNameEnAsc();
     List<Category> findByActiveTrueAndDeletedFalseOrderByCreatedAtDesc();
+
+    List<Category> findByActiveTrueAndDeletedFalseOrderByCreatedAtAsc();
+
 }

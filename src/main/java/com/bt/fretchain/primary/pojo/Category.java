@@ -1,5 +1,6 @@
 package com.bt.fretchain.primary.pojo;
 
+import com.bt.fretchain.primary.pojo.enums.FreightOrderType;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -34,4 +35,8 @@ public class Category extends BaseEntity {
             fetch = FetchType.LAZY
     )
     private List<SubCategory> subCategories;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "order_type", nullable = false, length = 50)
+    private FreightOrderType orderType;
 }

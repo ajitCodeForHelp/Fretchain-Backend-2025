@@ -11,7 +11,10 @@ import com.bt.fretchain.primary.pojo.enums.PickupType;
 import com.bt.fretchain.primary.repository.*;
 import com.bt.fretchain.primary.service.CustomerFreightOrderService;
 import com.bt.fretchain.primary.service.DistanceCalculationService;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,13 +42,22 @@ public class CustomerFreightOrderServiceImpl implements CustomerFreightOrderServ
 
     private final FreightOrderAddressRepository freightOrderAddressRepository;
 
+    private final CategoryRepository categoryRepository;
+
+    private final SubCategoryRepository subCategoryRepository;
+
     private final VehicleCategoryRepository vehicleCategoryRepository;
+
 
     private final SystemPricingRepository systemPricingRepository;
 
     private final DistanceCalculationService distanceCalculationService;
 
     private final FreightOrderStatusLogRepository freightOrderStatusLogRepository;
+
+    private final FreightOrderBulkMaterialDetailRepository bulkMaterialDetailRepository;
+
+    private final FreightOrderParcelDetailRepository parcelDetailRepository;
 
     @Override
     public CustomerFreightOrderDTO.EstimateResponse estimate(
@@ -74,15 +86,16 @@ public class CustomerFreightOrderServiceImpl implements CustomerFreightOrderServ
     @Override
     @Transactional
     public CustomerFreightOrderDTO.SaveDraftResponse createDraft(
-            CustomerFreightOrderDTO.CreateDraftRequest request
+            CustomerFreightOrderDTO.CreateDraftRequest request,
+            SystemUser customer
     ) {
 
-        VehicleCategory vehicleCategory =
-                vehicleCategoryRepository
-                        .findByUuidAndDeletedFalse(request.getVehicleCategoryUuid())
-                        .orElseThrow(() ->
-                                new ResourceNotFoundException("vehicle.category.notfound")
-                        );
+        ValidationResult validationResult =
+                validateCategorySelection(
+                        request.getCategoryUuid(),
+                        request.getSubCategoryUuid(),
+                        request.getVehicleCategoryUuid()
+                );
 
         validateServiceArea(
                 request.getPickupAddress(),
@@ -93,10 +106,17 @@ public class CustomerFreightOrderServiceImpl implements CustomerFreightOrderServ
 
         order.setOrderType(request.getOrderType());
         order.setOrderStatus(OrderStatus.DRAFT);
-        order.setVehicleCategory(vehicleCategory);
+
+        order.setCategory(validationResult.getCategory());
+        order.setSubCategory(validationResult.getSubCategory());
+        order.setVehicleCategory(validationResult.getVehicleCategory());
 
         order.setDistanceKm(request.getDistanceKm());
         order.setEstimatedTimeMinutes(request.getEstimatedTimeMinutes());
+
+        order.setCustomer(customer);
+        order.setCreatedBy(customer.getRecordId());
+        order.setModifiedBy(customer.getRecordId());
 
         FreightOrder savedOrder =
                 freightOrderRepository.save(order);
@@ -107,12 +127,10 @@ public class CustomerFreightOrderServiceImpl implements CustomerFreightOrderServ
                 request.getDropAddresses()
         );
 
-
-        savedOrder =
-                freightOrderRepository.save(savedOrder);
-
-
-        savedOrder.setOrderNumber("FC-" + savedOrder.getRecordId());
+        savedOrder.setOrderNumber(
+                "FC-" + savedOrder.getRecordId()
+        );
+        savedOrder.setModifiedBy(customer.getRecordId());
 
         savedOrder =
                 freightOrderRepository.save(savedOrder);
@@ -132,12 +150,16 @@ public class CustomerFreightOrderServiceImpl implements CustomerFreightOrderServ
     @Transactional
     public CustomerFreightOrderDTO.SaveDraftResponse updateDraft(
             String orderUuid,
-            CustomerFreightOrderDTO.UpdateDraftRequest request
+            CustomerFreightOrderDTO.UpdateDraftRequest request,
+            SystemUser customer
     ) {
 
         FreightOrder order =
                 freightOrderRepository
-                        .findByUuidAndDeletedFalse(orderUuid)
+                        .findByUuidAndCustomerAndDeletedFalse(
+                                orderUuid,
+                                customer
+                        )
                         .orElseThrow(() ->
                                 new ResourceNotFoundException("order.notfound")
                         );
@@ -146,17 +168,37 @@ public class CustomerFreightOrderServiceImpl implements CustomerFreightOrderServ
             throw new BadRequestException("Only draft order can be updated");
         }
 
-        if (request.getVehicleCategoryUuid() != null
-                && !request.getVehicleCategoryUuid().isBlank()) {
+        if (request.getCategoryUuid() != null
+                || request.getSubCategoryUuid() != null
+                || request.getVehicleCategoryUuid() != null) {
 
-            VehicleCategory vehicleCategory =
-                    vehicleCategoryRepository
-                            .findByUuidAndDeletedFalse(request.getVehicleCategoryUuid())
-                            .orElseThrow(() ->
-                                    new ResourceNotFoundException("vehicle.category.notfound")
-                            );
+            String categoryUuid =
+                    request.getCategoryUuid() != null
+                            ? request.getCategoryUuid()
+                            : order.getCategory().getUuid();
 
-            order.setVehicleCategory(vehicleCategory);
+            String subCategoryUuid =
+                    request.getSubCategoryUuid() != null
+                            ? request.getSubCategoryUuid()
+                            : order.getSubCategory() != null
+                            ? order.getSubCategory().getUuid()
+                            : null;
+
+            String vehicleCategoryUuid =
+                    request.getVehicleCategoryUuid() != null
+                            ? request.getVehicleCategoryUuid()
+                            : order.getVehicleCategory().getUuid();
+
+            ValidationResult validationResult =
+                    validateCategorySelection(
+                            categoryUuid,
+                            subCategoryUuid,
+                            vehicleCategoryUuid
+                    );
+
+            order.setCategory(validationResult.getCategory());
+            order.setSubCategory(validationResult.getSubCategory());
+            order.setVehicleCategory(validationResult.getVehicleCategory());
         }
 
         if (request.getPickupType() != null) {
@@ -182,8 +224,7 @@ public class CustomerFreightOrderServiceImpl implements CustomerFreightOrderServ
                     request.getDropAddresses()
             );
 
-            freightOrderAddressRepository
-                    .deleteByFreightOrder(order);
+            freightOrderAddressRepository.deleteByFreightOrder(order);
 
             saveOrderAddresses(
                     order,
@@ -192,9 +233,7 @@ public class CustomerFreightOrderServiceImpl implements CustomerFreightOrderServ
             );
 
             if (request.getDistanceKm() != null) {
-                order.setDistanceKm(
-                        request.getDistanceKm()
-                );
+                order.setDistanceKm(request.getDistanceKm());
             }
 
             if (request.getEstimatedTimeMinutes() != null) {
@@ -204,39 +243,78 @@ public class CustomerFreightOrderServiceImpl implements CustomerFreightOrderServ
             }
         }
 
+        order.setModifiedBy(customer.getRecordId());
+
         FreightOrder savedOrder =
                 freightOrderRepository.save(order);
+        switch (savedOrder.getOrderType()) {
 
-        if (savedOrder.getOrderType() == FreightOrderType.CONTAINER
-                && request.getContainerDetail() != null) {
+            case CONTAINER -> {
 
-            deleteOldContainerDetails(savedOrder);
+                if (request.getContainerDetail() != null) {
 
-            saveContainerDetails(
-                    savedOrder,
-                    request.getContainerDetail()
-            );
-        }
+                    deleteOldContainerDetails(savedOrder);
 
-        if (savedOrder.getOrderType() == FreightOrderType.BREAK_BULK
-                && request.getBreakBulkDetail() != null) {
+                    saveContainerDetails(
+                            savedOrder,
+                            request.getContainerDetail()
+                    );
+                }
+            }
+//           TODO DO FOR OTHER TYPE ALSO
 
-            deleteOldBreakBulkDetails(savedOrder);
+//            case CONTAINER -> {
+//                if (request.getContainerDetail() != null) {
+//                    saveOrUpdateContainerDetails(
+//                            savedOrder,
+//                            request.getContainerDetail()
+//                    );
+//                }
+//            }
 
-            saveBreakBulkDetails(
-                    savedOrder,
-                    request.getBreakBulkDetail()
-            );
+            case BREAK_BULK -> {
+
+                if (request.getBreakBulkDetail() != null) {
+
+                    deleteOldBreakBulkDetails(savedOrder);
+
+                    saveBreakBulkDetails(
+                            savedOrder,
+                            request.getBreakBulkDetail()
+                    );
+                }
+            }
+
+            case PARCEL -> {
+
+                if (request.getParcelDetail() != null) {
+
+                    deleteOldParcelDetails(savedOrder);
+
+                    saveParcelDetails(
+                            savedOrder,
+                            request.getParcelDetail()
+                    );
+                }
+            }
+
+            case BULK_MATERIAL -> {
+
+                if (request.getBulkMaterialDetail() != null) {
+
+                    deleteOldBulkMaterialDetails(savedOrder);
+
+                    saveBulkMaterialDetails(
+                            savedOrder,
+                            request.getBulkMaterialDetail()
+                    );
+                }
+            }
         }
 
         if (request.getDocuments() != null) {
-
             documentRepository.deleteByFreightOrder(savedOrder);
-
-            saveDocuments(
-                    savedOrder,
-                    request.getDocuments()
-            );
+            saveDocuments(savedOrder, request.getDocuments());
         }
 
         CustomerFreightOrderDTO.EstimateRequest estimateRequest =
@@ -251,14 +329,10 @@ public class CustomerFreightOrderServiceImpl implements CustomerFreightOrderServ
                         estimateRequest
                 );
 
-        saveOrUpdatePricing(
-                savedOrder,
-                estimateResponse
-        );
+        saveOrUpdatePricing(savedOrder, estimateResponse);
 
-        savedOrder.setTotalAmount(
-                estimateResponse.getTotalAmount()
-        );
+        savedOrder.setTotalAmount(estimateResponse.getTotalAmount());
+        savedOrder.setModifiedBy(customer.getRecordId());
 
         freightOrderRepository.save(savedOrder);
 
@@ -272,16 +346,18 @@ public class CustomerFreightOrderServiceImpl implements CustomerFreightOrderServ
         return response;
     }
 
-
     @Override
     @Transactional(readOnly = true)
     public CustomerFreightOrderDTO.OrderDetailResponse orderDetail(
-            String orderUuid
+            String orderUuid , SystemUser customer
     ) {
 
         FreightOrder order =
                 freightOrderRepository
-                        .findByUuidAndDeletedFalse(orderUuid)
+                        .findByUuidAndCustomerAndDeletedFalse(
+                                orderUuid,
+                                customer
+                        )
                         .orElseThrow(() ->
                                 new ResourceNotFoundException("order.notfound")
                         );
@@ -312,12 +388,44 @@ public class CustomerFreightOrderServiceImpl implements CustomerFreightOrderServ
 
         response.setVehicle(vehicle);
 
+        if (order.getCategory() != null) {
+
+            CustomerFreightOrderDTO.CategoryDetail category =
+                    new CustomerFreightOrderDTO.CategoryDetail();
+
+            category.setUuid(order.getCategory().getUuid());
+            category.setNameEn(order.getCategory().getNameEn());
+            category.setNameFr(order.getCategory().getNameFr());
+
+            response.setCategory(category);
+        }
+
+        if (order.getSubCategory() != null) {
+
+            CustomerFreightOrderDTO.CategoryDetail subCategory =
+                    new CustomerFreightOrderDTO.CategoryDetail();
+
+            subCategory.setUuid(order.getSubCategory().getUuid());
+            subCategory.setNameEn(order.getSubCategory().getNameEn());
+            subCategory.setNameFr(order.getSubCategory().getNameFr());
+
+            response.setSubCategory(subCategory);
+        }
+
+
         mapOrderAddresses(order, response);
         mapOrderPricing(order, response);
         mapOrderDocuments(order, response);
-        mapContainerDetail(order, response);
-        mapBreakBulkDetail(order, response);
+        switch (order.getOrderType()) {
 
+            case CONTAINER -> mapContainerDetail(order, response);
+
+            case BREAK_BULK -> mapBreakBulkDetail(order, response);
+
+            case PARCEL -> mapParcelDetail(order, response);
+
+            case BULK_MATERIAL -> mapBulkMaterialDetail(order, response);
+        }
         return response;
     }
 
@@ -325,12 +433,15 @@ public class CustomerFreightOrderServiceImpl implements CustomerFreightOrderServ
     @Override
     @Transactional
     public CustomerFreightOrderDTO.PlaceOrderResponse placeOrder(
-            String orderUuid
+            String orderUuid , SystemUser customer
     ) {
 
         FreightOrder order =
                 freightOrderRepository
-                        .findByUuidAndDeletedFalse(orderUuid)
+                        .findByUuidAndCustomerAndDeletedFalse(
+                                orderUuid,
+                                customer
+                        )
                         .orElseThrow(() ->
                                 new ResourceNotFoundException("order.notfound")
                         );
@@ -363,6 +474,204 @@ public class CustomerFreightOrderServiceImpl implements CustomerFreightOrderServ
         return response;
     }
 
+
+    @Override
+    @Transactional(readOnly = true)
+    public CustomerFreightOrderDTO.OrderDetailResponse getDraftOrder(
+            SystemUser customer,
+            String categoryUuid,
+            String subCategoryUuid
+    ) {
+
+        FreightOrder order =
+                freightOrderRepository
+                        .findLatestDraft(
+                                customer,
+                                categoryUuid,
+                                OrderStatus.DRAFT,
+                                PageRequest.of(0, 1)
+                        )
+                        .stream()
+                        .findFirst()
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException("draft.order.notfound")
+                        );
+
+        return orderDetail(order.getUuid(), customer);
+    }
+
+    private void deleteOldParcelDetails(
+            FreightOrder order
+    ) {
+
+        parcelDetailRepository
+                .findByFreightOrder(order)
+                .ifPresent(parcelDetailRepository::delete);
+        parcelDetailRepository.flush();
+    }
+
+
+    private void deleteOldBulkMaterialDetails(
+            FreightOrder order
+    ) {
+
+        bulkMaterialDetailRepository
+                .findByFreightOrder(order)
+                .ifPresent(bulkMaterialDetailRepository::delete);
+        bulkMaterialDetailRepository.flush();
+    }
+
+    private void saveParcelDetails(
+            FreightOrder order,
+            CustomerFreightOrderDTO.ParcelDetailRequest request
+    ) {
+
+        FreightOrderParcelDetail detail =
+                new FreightOrderParcelDetail();
+
+        detail.setFreightOrder(order);
+
+        detail.setPackageType(request.getPackageType());
+        detail.setNumberOfPackages(request.getNumberOfPackages());
+        detail.setWeightKg(request.getWeightKg());
+        detail.setFragile(request.getFragile());
+
+        detail.setCodAmount(request.getCodAmount());
+        detail.setPackageValue(request.getPackageValue());
+
+        detail.setPackagingType(request.getPackagingType());
+
+        detail.setExpressDelivery(request.getExpressDelivery());
+        detail.setSameDay(request.getSameDay());
+
+        detail.setScheduledDeliveryTime(
+                request.getScheduledDeliveryTime()
+        );
+
+        parcelDetailRepository.save(detail);
+    }
+
+
+    private void saveBulkMaterialDetails(
+            FreightOrder order,
+            CustomerFreightOrderDTO.BulkMaterialDetailRequest request
+    ) {
+
+        FreightOrderBulkMaterialDetail detail =
+                new FreightOrderBulkMaterialDetail();
+
+        detail.setFreightOrder(order);
+
+        detail.setMaterialType(request.getMaterialType());
+        detail.setOtherMaterialType(request.getOtherMaterialType());
+
+        detail.setQuantityUnit(request.getQuantityUnit());
+        detail.setQuantity(request.getQuantity());
+
+        detail.setEstimatedWeightKg(
+                request.getEstimatedWeightKg()
+        );
+
+        detail.setLoadingSite(request.getLoadingSite());
+
+        detail.setSiteAccessibility(
+                request.getSiteAccessibility()
+        );
+
+        detail.setDeliverySite(request.getDeliverySite());
+
+        detail.setDeliveryTimeWindow(
+                request.getDeliveryTimeWindow()
+        );
+
+        detail.setDeliveryInstructions(
+                request.getDeliveryInstructions()
+        );
+
+        detail.setNumberOfTrucksNeeded(
+                request.getNumberOfTrucksNeeded()
+        );
+
+        detail.setEstimatedNumberOfTrips(
+                request.getEstimatedNumberOfTrips()
+        );
+
+        bulkMaterialDetailRepository.save(detail);
+    }
+    private ValidationResult validateCategorySelection(
+            String categoryUuid,
+            String subCategoryUuid,
+            String vehicleCategoryUuid
+    ) {
+
+        Category category =
+                categoryRepository
+                        .findByUuidAndDeletedFalse(categoryUuid)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException("category.notfound")
+                        );
+
+        SubCategory subCategory = null;
+
+        if (subCategoryUuid != null && !subCategoryUuid.isBlank()) {
+
+            subCategory =
+                    subCategoryRepository
+                            .findByUuidAndDeletedFalse(subCategoryUuid)
+                            .orElseThrow(() ->
+                                    new ResourceNotFoundException("subCategory.notfound")
+                            );
+
+            if (!subCategory.getCategory().getRecordId()
+                    .equals(category.getRecordId())) {
+
+                throw new BadRequestException("subCategory.invalid");
+            }
+        }
+
+        VehicleCategory vehicleCategory =
+                vehicleCategoryRepository
+                        .findByUuidAndDeletedFalse(vehicleCategoryUuid)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException("vehicle.category.notfound")
+                        );
+// TODO RECHECK
+
+//        if (!vehicleCategory.getCategory().getRecordId()
+//                .equals(category.getRecordId())) {
+//
+//            throw new BadRequestException("vehicle.category.invalid");
+//        }
+
+//        if (subCategory != null) {
+//
+//            if (vehicleCategory.getSubCategory() == null
+//                    || !vehicleCategory.getSubCategory()
+//                    .getRecordId()
+//                    .equals(subCategory.getRecordId())) {
+//
+//                throw new BadRequestException("vehicle.category.invalid");
+//            }
+//        }
+
+        return new ValidationResult(
+                category,
+                subCategory,
+                vehicleCategory
+        );
+    }
+
+
+    @Getter
+    @AllArgsConstructor
+    private static class ValidationResult {
+
+        private Category category;
+
+        private SubCategory subCategory;
+
+        private VehicleCategory vehicleCategory;
+    }
 
     private void validateOrderBeforePlace(
             FreightOrder order
@@ -472,6 +781,8 @@ public class CustomerFreightOrderServiceImpl implements CustomerFreightOrderServ
             dto.setFullAddress(address.getFullAddress());
             dto.setLandmark(address.getLandmark());
             dto.setSequenceNo(address.getSequenceNo());
+            dto.setLatitude(address.getLatitude());
+            dto.setLongitude(address.getLongitude());
 
             if (address.getAddressRole() == AddressRole.PICKUP) {
                 response.setPickupAddress(dto);
@@ -479,6 +790,7 @@ public class CustomerFreightOrderServiceImpl implements CustomerFreightOrderServ
                 drops.add(dto);
             }
         }
+
 
         response.setDropAddresses(drops);
     }
@@ -612,6 +924,63 @@ public class CustomerFreightOrderServiceImpl implements CustomerFreightOrderServ
                     response.setBreakBulkDetail(dto);
                 });
     }
+
+    private void mapParcelDetail(
+            FreightOrder order,
+            CustomerFreightOrderDTO.OrderDetailResponse response
+    ) {
+
+        parcelDetailRepository
+                .findByFreightOrder(order)
+                .ifPresent(detail -> {
+
+                    CustomerFreightOrderDTO.ParcelDetailRequest dto =
+                            new CustomerFreightOrderDTO.ParcelDetailRequest();
+
+                    dto.setPackageType(detail.getPackageType());
+                    dto.setNumberOfPackages(detail.getNumberOfPackages());
+                    dto.setWeightKg(detail.getWeightKg());
+                    dto.setFragile(detail.getFragile());
+                    dto.setCodAmount(detail.getCodAmount());
+                    dto.setPackageValue(detail.getPackageValue());
+                    dto.setPackagingType(detail.getPackagingType());
+                    dto.setExpressDelivery(detail.getExpressDelivery());
+                    dto.setSameDay(detail.getSameDay());
+                    dto.setScheduledDeliveryTime(detail.getScheduledDeliveryTime());
+
+                    response.setParcelDetail(dto);
+                });
+    }
+
+
+    private void mapBulkMaterialDetail(
+            FreightOrder order,
+            CustomerFreightOrderDTO.OrderDetailResponse response
+    ) {
+
+        bulkMaterialDetailRepository
+                .findByFreightOrder(order)
+                .ifPresent(detail -> {
+
+                    CustomerFreightOrderDTO.BulkMaterialDetailRequest dto =
+                            new CustomerFreightOrderDTO.BulkMaterialDetailRequest();
+
+                    dto.setMaterialType(detail.getMaterialType());
+                    dto.setOtherMaterialType(detail.getOtherMaterialType());
+                    dto.setQuantityUnit(detail.getQuantityUnit());
+                    dto.setQuantity(detail.getQuantity());
+                    dto.setEstimatedWeightKg(detail.getEstimatedWeightKg());
+                    dto.setLoadingSite(detail.getLoadingSite());
+                    dto.setSiteAccessibility(detail.getSiteAccessibility());
+                    dto.setDeliverySite(detail.getDeliverySite());
+                    dto.setDeliveryTimeWindow(detail.getDeliveryTimeWindow());
+                    dto.setDeliveryInstructions(detail.getDeliveryInstructions());
+                    dto.setNumberOfTrucksNeeded(detail.getNumberOfTrucksNeeded());
+                    dto.setEstimatedNumberOfTrips(detail.getEstimatedNumberOfTrips());
+
+                    response.setBulkMaterialDetail(dto);
+                });
+    }
     private void saveOrderAddresses(
             FreightOrder order,
             CustomerFreightOrderDTO.AddressRequest pickupAddress,
@@ -626,6 +995,9 @@ public class CustomerFreightOrderServiceImpl implements CustomerFreightOrderServ
         pickup.setSequenceNo(0);
 
         freightOrderAddressRepository.save(pickup);
+
+        order.setPickupAddress(pickup);
+
 
         if (dropAddresses == null) {
             return;
@@ -674,19 +1046,62 @@ public class CustomerFreightOrderServiceImpl implements CustomerFreightOrderServ
         }
     }
 
+    @Transactional
     private void deleteOldContainerDetails(FreightOrder order) {
+
         containerDetailRepository
                 .findByFreightOrder(order)
                 .ifPresent(containerDetail -> {
+
                     containerItemRepository.deleteByContainerDetail(containerDetail);
+                    containerItemRepository.flush();
+
                     containerDetailRepository.delete(containerDetail);
+                    containerDetailRepository.flush();
                 });
+    }
+
+    private void saveOrUpdateContainerDetails(
+            FreightOrder order,
+            CustomerFreightOrderDTO.ContainerDetailRequest request
+    ) {
+        FreightOrderContainerDetail detail =
+                containerDetailRepository.findByFreightOrder(order)
+                        .orElse(new FreightOrderContainerDetail());
+
+        detail.setFreightOrder(order);
+        detail.setLoadType(request.getLoadType());
+        detail.setDangerousGoods(request.getDangerousGoods());
+        detail.setNatureOfGoods(request.getNatureOfGoods());
+        detail.setShippingLine(request.getShippingLine());
+        detail.setShippingLineEmail(request.getShippingLineEmail());
+        detail.setCargoWeightKg(request.getCargoWeightKg());
+        detail.setInsurance(request.getInsurance());
+        detail.setCargoValue(request.getCargoValue());
+        detail.setReturnEmptyContainer(request.getReturnEmptyContainer());
+
+        FreightOrderContainerDetail savedDetail =
+                containerDetailRepository.save(detail);
+
+        containerItemRepository.deleteByContainerDetail(savedDetail);
+        containerItemRepository.flush();
+
+        if (request.getContainerItems() != null) {
+            request.getContainerItems().forEach(item -> {
+                FreightOrderContainerItem containerItem = new FreightOrderContainerItem();
+                containerItem.setContainerDetail(savedDetail);
+                containerItem.setContainerNumber(item.getContainerNumber());
+                containerItem.setSealNumber(item.getSealNumber());
+                containerItemRepository.save(containerItem);
+            });
+        }
     }
 
     private void deleteOldBreakBulkDetails(FreightOrder order) {
         breakBulkDetailRepository
                 .findByFreightOrder(order)
                 .ifPresent(breakBulkDetailRepository::delete);
+        breakBulkDetailRepository.flush();
     }
     private CustomerFreightOrderDTO.EstimateRequest buildEstimateRequest(
             FreightOrder order,

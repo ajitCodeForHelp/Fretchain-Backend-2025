@@ -86,6 +86,11 @@ public class CustomerFreightOrderDTO {
         @NotBlank
         private String vehicleCategoryUuid;
 
+        @NotBlank
+        private String categoryUuid;
+
+        private String subCategoryUuid;
+
         @NotNull
         private Double distanceKm;
 
@@ -108,6 +113,10 @@ public class CustomerFreightOrderDTO {
 
         private String vehicleCategoryUuid;
 
+        private String categoryUuid;
+
+        private String subCategoryUuid;
+
         private PickupType pickupType;
 
         private LocalDateTime pickupDateTime;
@@ -125,6 +134,10 @@ public class CustomerFreightOrderDTO {
         private ContainerDetailRequest containerDetail;
 
         private BreakBulkDetailRequest breakBulkDetail;
+
+        private ParcelDetailRequest parcelDetail;
+
+        private BulkMaterialDetailRequest bulkMaterialDetail;
 
         private List<DocumentRequest> documents;
     }
@@ -269,11 +282,19 @@ public class CustomerFreightOrderDTO {
 
         private VehicleDetail vehicle;
 
+        private CategoryDetail category;
+
+        private CategoryDetail subCategory;
+
         private AddressRequest pickupAddress;
         private List<AddressRequest> dropAddresses;
 
         private ContainerDetailRequest containerDetail;
         private BreakBulkDetailRequest breakBulkDetail;
+
+        private BulkMaterialDetailRequest bulkMaterialDetail;
+
+        private ParcelDetailRequest parcelDetail;
 
         private List<DocumentRequest> documents;
 
@@ -299,6 +320,73 @@ public class CustomerFreightOrderDTO {
         private String orderNumber;
         private OrderStatus orderStatus;
         private BigDecimal totalAmount;
+    }
+
+
+    @Getter
+    @Setter
+    public static class ParcelDetailRequest {
+
+        private String packageType;
+
+        private Integer numberOfPackages;
+
+        private Double weightKg;
+
+        private Boolean fragile = false;
+
+        private BigDecimal codAmount;
+
+        private BigDecimal packageValue;
+
+        private String packagingType;
+
+        private Boolean expressDelivery = false;
+
+        private Boolean sameDay = false;
+
+        private LocalDateTime scheduledDeliveryTime;
+    }
+
+    @Getter
+    @Setter
+    public static class BulkMaterialDetailRequest {
+
+        private String materialType;
+
+        private String otherMaterialType;
+
+        private String quantityUnit; // TONS, CUBIC_METERS
+
+        private Double quantity;
+
+        private Double estimatedWeightKg;
+
+        private String loadingSite;
+
+        private String siteAccessibility; // GOOD_ROAD, OFF_ROAD, MUDDY, MOUNTAIN
+
+        private String deliverySite;
+
+        private String deliveryTimeWindow;
+
+        private String deliveryInstructions;
+
+        private Integer numberOfTrucksNeeded;
+
+        private Integer estimatedNumberOfTrips;
+    }
+
+
+    @Getter
+    @Setter
+    public static class CategoryDetail {
+
+        private String uuid;
+
+        private String nameEn;
+
+        private String nameFr;
     }
 }
 

@@ -57,6 +57,14 @@ public class FreightOrder extends BaseEntity {
     private VehicleCategory vehicleCategory;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id")
+    private Category category;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sub_category_id")
+    private SubCategory subCategory;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "pickup_address_id")
     private FreightOrderAddress pickupAddress;
 
@@ -79,4 +87,11 @@ public class FreightOrder extends BaseEntity {
 
     @Column(name = "total_amount", precision = 14, scale = 2)
     private BigDecimal totalAmount;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "coupon_id")
+    private Coupon coupon;
+
+    @Column(name = "coupon_discount_amount", precision = 12, scale = 2)
+    private BigDecimal couponDiscountAmount;
 }

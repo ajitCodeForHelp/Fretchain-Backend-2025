@@ -18,12 +18,6 @@ public class VehicleCategory extends BaseEntity {
     @Column(name = "name_fr", nullable = false, length = 150)
     private String nameFr;
 
-    @Column(name = "sub_title_en", length = 255)
-    private String subTitleEn;
-
-    @Column(name = "sub_title_fr", length = 255)
-    private String subTitleFr;
-
     @Column(name = "icon_url", length = 500)
     private String iconUrl;
 

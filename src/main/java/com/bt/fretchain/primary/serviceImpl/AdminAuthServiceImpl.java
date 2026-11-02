@@ -3,6 +3,7 @@ package com.bt.fretchain.primary.serviceImpl;
 import com.bt.fretchain.exception.BadRequestException;
 import com.bt.fretchain.exception.ResourceNotFoundException;
 import com.bt.fretchain.primary.dto.AdminAuthDto;
+import com.bt.fretchain.primary.dto.CustomerAuthDTO;
 import com.bt.fretchain.primary.pojo.SystemUser;
 import com.bt.fretchain.primary.repository.SystemUserRepository;
 import com.bt.fretchain.primary.service.AdminAuthService;
@@ -71,4 +72,5 @@ public class AdminAuthServiceImpl implements AdminAuthService {
         adminDetail.setSecretKey(jwtTokenUtil.generateToken(bodyPart, user));
         return adminDetail;
     }
+
 }

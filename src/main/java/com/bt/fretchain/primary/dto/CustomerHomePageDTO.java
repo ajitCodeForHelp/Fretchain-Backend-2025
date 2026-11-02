@@ -13,6 +13,25 @@ public class CustomerHomePageDTO {
 
     @Getter
     @Setter
+    public static class BannerResponse {
+
+        private String uuid;
+
+        private String titleEn;
+
+        private String titleFr;
+
+        private String descriptionEn;
+
+        private String descriptionFr;
+
+        private String imageUrl;
+
+        private String redirectUrl;
+    }
+
+    @Getter
+    @Setter
     public static class CategoryResponse {
 
         private String uuid;

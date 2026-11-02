@@ -2,8 +2,10 @@ package com.bt.fretchain.primary.serviceImpl;
 
 import com.bt.fretchain.primary.dto.CustomerHomePageDTO;
 import com.bt.fretchain.primary.dto.DistanceTimeDTO;
+import com.bt.fretchain.primary.mapper.BannerMapper;
 import com.bt.fretchain.primary.mapper.CustomerHomePageMapper;
 import com.bt.fretchain.primary.pojo.VehicleCategory;
+import com.bt.fretchain.primary.repository.BannerRepository;
 import com.bt.fretchain.primary.repository.CategoryRepository;
 import com.bt.fretchain.primary.repository.VehicleCategoryRepository;
 import com.bt.fretchain.primary.service.CustomerHomePageService;
@@ -14,6 +16,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -28,14 +31,29 @@ public class CustomerHomePageServiceImpl implements CustomerHomePageService {
 
     private final DistanceCalculationService distanceCalculationService;
 
+    private final BannerRepository bannerRepository;
+
+    private final BannerMapper bannerMapper;
+
     @Value("${distance.provider}")
     private String distanceApi;
+
+
+    @Override
+    public List<CustomerHomePageDTO.BannerResponse> getBannerList() {
+
+        return bannerRepository
+                .findActiveBanners(LocalDateTime.now())
+                .stream()
+                .map(bannerMapper::toCustomerBannerResponse)
+                .toList();
+    }
 
     @Override
     public List<CustomerHomePageDTO.CategoryResponse> getCategoryList() {
 
         return categoryRepository
-                .findByActiveTrueAndDeletedFalseOrderByCreatedAtDesc()
+                .findByActiveTrueAndDeletedFalseOrderByCreatedAtAsc()
                 .stream()
                 .map(category ->
                         customerHomePageMapper.toCategoryResponse(
@@ -52,24 +70,24 @@ public class CustomerHomePageServiceImpl implements CustomerHomePageService {
 
         List<VehicleCategory> vehicleCategories;
 
-        if (request.getSubCategoryUuid() != null
-                && !request.getSubCategoryUuid().isBlank()) {
-
-            vehicleCategories =
-                    vehicleCategoryRepository
-                            .findByCategoryAndSubCategory(
-                                    request.getCategoryUuid(),
-                                    request.getSubCategoryUuid()
-                            );
-
-        } else {
+//        if (request.getSubCategoryUuid() != null
+//                && !request.getSubCategoryUuid().isBlank()) {
+//
+//            vehicleCategories =
+//                    vehicleCategoryRepository
+//                            .findByCategoryAndSubCategory(
+//                                    request.getCategoryUuid(),
+//                                    request.getSubCategoryUuid()
+//                            );
+//
+//        } else {
 
             vehicleCategories =
                     vehicleCategoryRepository
                             .findByCategory(
                                     request.getCategoryUuid()
                             );
-        }
+//        }
 
         return vehicleCategories
                 .stream()

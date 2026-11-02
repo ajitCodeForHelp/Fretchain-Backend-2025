@@ -69,6 +69,8 @@ public class VehicleTypeDTO {
     @Getter
     @Setter
     public static class BasicDetail {
+        protected String uuid;
+
         private String nameEn;
         private String nameFr;
         private String iconUrl;

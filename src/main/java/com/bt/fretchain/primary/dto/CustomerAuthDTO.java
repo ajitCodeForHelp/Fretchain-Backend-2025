@@ -1,6 +1,7 @@
 package com.bt.fretchain.primary.dto;
 
 import com.bt.fretchain.primary.pojo.enums.OtpSentOnTypeEnum;
+import com.bt.fretchain.primary.pojo.enums.UserTypeEnum;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
@@ -52,5 +53,7 @@ public class CustomerAuthDTO {
         private String email;
 
         private Boolean profileCompleted;
+
+        private UserTypeEnum userType;
     }
 }

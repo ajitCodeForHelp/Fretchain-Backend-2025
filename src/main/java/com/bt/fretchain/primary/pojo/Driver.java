@@ -21,7 +21,7 @@ import java.time.LocalDateTime;
 )
 @Getter
 @Setter
-public class Driver extends BaseEntity {
+public class Driver extends BaseEntity  {
 
     @Column(name = "full_name", nullable = false, length = 120)
     private String fullName;
@@ -68,6 +68,9 @@ public class Driver extends BaseEntity {
 
     @Column(name = "online_status")
     private Boolean onlineStatus = false;
+
+    @Column(name = "last_login")
+    private LocalDateTime lastLogin;
 
     @Column(name = "overall_rating", precision = 2, scale = 1)
     private BigDecimal overallRating = BigDecimal.ZERO;

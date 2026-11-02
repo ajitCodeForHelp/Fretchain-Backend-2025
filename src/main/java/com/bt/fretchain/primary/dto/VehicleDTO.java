@@ -61,6 +61,7 @@ public class VehicleDTO {
     @Getter
     @Setter
     public static class Basic {
+        protected String uuid;
         private String vehicleNumber;
         private String vehicleCategoryUuid;
         private String vehicleCategoryNameEn;

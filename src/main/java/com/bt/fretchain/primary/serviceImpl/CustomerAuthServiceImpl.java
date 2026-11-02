@@ -168,6 +168,8 @@ public class CustomerAuthServiceImpl implements CustomerAuthService {
         response.setFullName(user.getFullName());
         response.setMobile(user.getMobile());
         response.setEmail(user.getEmail());
+        response.setUserType(user.getUserType());
+
         response.setProfileCompleted(!TextUtils.isEmpty(user.getFullName()));
 
         return response;

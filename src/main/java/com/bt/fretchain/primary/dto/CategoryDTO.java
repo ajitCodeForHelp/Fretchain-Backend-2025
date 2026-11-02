@@ -1,5 +1,6 @@
 package com.bt.fretchain.primary.dto;
 
+import com.bt.fretchain.primary.pojo.enums.FreightOrderType;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.Setter;
@@ -24,6 +25,7 @@ public class CategoryDTO {
         private String descriptionFr;
 
         private String imageUrl;
+
     }
 
     @Getter
@@ -41,6 +43,9 @@ public class CategoryDTO {
         private String imageUrl;
 
         private List<SubCategoryDTO.DetailForCategory> subCategories;
+
+        private FreightOrderType orderType;
+
     }
 
     @Getter

@@ -6,6 +6,7 @@ import java.util.List;
 
 public interface CustomerHomePageService {
 
+    List<CustomerHomePageDTO.BannerResponse> getBannerList();
     List<CustomerHomePageDTO.CategoryResponse> getCategoryList();
 
     List<CustomerHomePageDTO.VehicleCategoryResponse>

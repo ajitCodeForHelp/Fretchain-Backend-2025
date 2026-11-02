@@ -15,6 +15,18 @@ public class CustomerHomePageController {
 
     private final CustomerHomePageService customerHomePageService;
 
+    @GetMapping("/banners")
+    public ResponseEntity<ResponseData> getBanners() {
+
+        return ResponseEntity.ok(
+                ResponseData.builder()
+                        .statusCode(200)
+                        .message("record.fetched")
+                        .data(customerHomePageService.getBannerList())
+                        .build()
+        );
+    }
+
     @GetMapping("/categories")
     public ResponseEntity<ResponseData> getCategories() {
         return ResponseEntity.ok(

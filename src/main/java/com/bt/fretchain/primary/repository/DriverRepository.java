@@ -1,5 +1,6 @@
 package com.bt.fretchain.primary.repository;
 
+import com.bt.fretchain.primary.dto.AvailableDriverResponse;
 import com.bt.fretchain.primary.pojo.Driver;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -9,7 +10,8 @@ import java.util.Optional;
 
 public interface DriverRepository extends
         JpaRepository<Driver, Long>,
-        JpaSpecificationExecutor<Driver> {
+        JpaSpecificationExecutor<Driver> ,
+        DriverRepositoryCustom {
 
     Optional<Driver> findByUuidAndDeletedFalse(String uuid);
 
@@ -18,4 +20,7 @@ public interface DriverRepository extends
     Optional<Driver> findByUsernameAndDeletedFalse(String username);
 
     List<Driver> findByActiveTrueAndDeletedFalseOrderByFullNameAsc();
+    List<AvailableDriverResponse> getAvailableDriversForOrder(
+            Long orderId
+    );
 }

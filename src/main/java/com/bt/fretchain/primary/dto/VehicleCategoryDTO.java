@@ -29,12 +29,6 @@ public class VehicleCategoryDTO {
         @Size(max = 150)
         private String nameFr;
 
-        @Size(max = 255)
-        private String subTitleEn;
-
-        @Size(max = 255)
-        private String subTitleFr;
-
         @Size(max = 500)
         private String iconUrl;
 
@@ -77,9 +71,6 @@ public class VehicleCategoryDTO {
 
         private String nameEn;
         private String nameFr;
-
-        private String subTitleEn;
-        private String subTitleFr;
 
         private String iconUrl;
 
@@ -149,9 +140,6 @@ public class VehicleCategoryDTO {
 
         private String nameEn;
         private String nameFr;
-
-        private String subTitleEn;
-        private String subTitleFr;
 
         private String iconUrl;
 

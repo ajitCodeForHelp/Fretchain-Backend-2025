@@ -16,6 +16,7 @@ public class FreightOrderContainerDetail extends BaseEntity {
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "freight_order_id", nullable = false, unique = true)
     private FreightOrder freightOrder;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "load_type", length = 50)
     private ContainerLoadType loadType; // EMPTY, LADEN

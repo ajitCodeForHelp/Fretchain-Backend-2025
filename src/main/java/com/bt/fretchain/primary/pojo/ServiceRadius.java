@@ -12,6 +12,15 @@ import lombok.Setter;
 @Setter
 public class ServiceRadius extends BaseEntity {
 
+    @Column(name = "area_name", nullable = false, length = 150)
+    private String areaName;
+
+    @Column(name = "city_name", length = 100)
+    private String cityName;
+
+    @Column(name = "country_name", length = 100)
+    private String countryName;
+
     @Column(name = "center_latitude")
     private Double centerLatitude;
 

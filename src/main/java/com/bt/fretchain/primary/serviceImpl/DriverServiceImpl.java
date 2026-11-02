@@ -136,43 +136,43 @@ public class DriverServiceImpl implements DriverService {
         }
 
         document.setIdentityNumber(
-                request.getIdentityNumber()
+                request.getDriverDocument().getIdentityNumber()
         );
 
         document.setIdentityDocumentUrl(
-                request.getIdentityDocumentUrl()
+                request.getDriverDocument().getIdentityDocumentUrl()
         );
 
         document.setLicenseImageUrl(
-                request.getLicenseImageUrl()
+                request.getDriverDocument().getLicenseImageUrl()
         );
 
         document.setPoliceVerificationUrl(
-                request.getPoliceVerificationUrl()
+                request.getDriverDocument().getPoliceVerificationUrl()
         );
 
         document.setAddressProofUrl(
-                request.getAddressProofUrl()
+                request.getDriverDocument().getAddressProofUrl()
         );
 
         document.setContractDocumentUrl(
-                request.getContractDocumentUrl()
+                request.getDriverDocument().getContractDocumentUrl()
         );
 
         document.setMedicalCertificateUrl(
-                request.getMedicalCertificateUrl()
+                request.getDriverDocument().getMedicalCertificateUrl()
         );
 
-        document.setLicenseValidity(
-                request.getDocumentLicenseValidity()
-        );
+//        document.setLicenseValidity(
+//                request.getDocumentLicenseValidity()
+//        );
 
         document.setReferenceName(
-                request.getReferenceName()
+                request.getDriverDocument().getReferenceName()
         );
 
         document.setReferenceMobile(
-                request.getReferenceMobile()
+                request.getDriverDocument().getReferenceMobile()
         );
 
         document.setModifiedBy(user.getRecordId());

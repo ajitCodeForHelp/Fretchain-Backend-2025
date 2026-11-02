@@ -1,5 +1,6 @@
 package com.bt.fretchain.primary.dto;
 
+import com.bt.fretchain.primary.pojo.DriverDocument;
 import com.bt.fretchain.primary.pojo.enums.GenderTypeEnum;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
@@ -39,28 +40,12 @@ public class DriverDTO {
 
         private LocalDate licenseExpiryDate;
 
+        private String nationalId;
+
         private String nationalIdNumber;
-
-        private String identityNumber;
-
         // Driver document fields
-        private String identityDocumentUrl;
+        private DriverDocumentDetail driverDocument;
 
-        private String licenseImageUrl;
-
-        private String policeVerificationUrl;
-
-        private String addressProofUrl;
-
-        private String contractDocumentUrl;
-
-        private String medicalCertificateUrl;
-
-        private LocalDate documentLicenseValidity;
-
-        private String referenceName;
-
-        private String referenceMobile;
     }
 
     @Getter
@@ -109,7 +94,8 @@ public class DriverDTO {
 
         private VehicleDTO.Basic vehicle;
 
-        private DriverDocumentDetail document;
+        private DriverDocumentDetail driverDocument;
+
     }
 
     @Getter

@@ -1,7 +1,9 @@
 package com.bt.fretchain.primary.controller.customer;
 
 import com.bt.fretchain.bean.ResponseData;
+import com.bt.fretchain.primary.controller._BaseController;
 import com.bt.fretchain.primary.dto.CustomerFreightOrderDTO;
+import com.bt.fretchain.primary.pojo.SystemUser;
 import com.bt.fretchain.primary.service.CustomerFreightOrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -11,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/customer/api/freight-order")
 @RequiredArgsConstructor
-public class CustomerFreightOrderController {
+public class CustomerFreightOrderController extends _BaseController {
 
     private final CustomerFreightOrderService customerFreightOrderService;
 
@@ -28,15 +30,18 @@ public class CustomerFreightOrderController {
         );
     }
 
-    @PostMapping("/save-draft")
+    @PostMapping("/" +
+            "save-draft")
     public ResponseEntity<ResponseData> saveDraft(
             @Valid @RequestBody CustomerFreightOrderDTO.CreateDraftRequest request
     ) {
+        SystemUser user = getLoggedInUser();
+
         return ResponseEntity.ok(
                 ResponseData.builder()
                         .statusCode(200)
                         .message("order.draft.saved")
-                        .data(customerFreightOrderService.createDraft(request))
+                        .data(customerFreightOrderService.createDraft(request, user))
                         .build()
         );
     }
@@ -46,11 +51,13 @@ public class CustomerFreightOrderController {
             @PathVariable String orderUuid,
             @Valid @RequestBody CustomerFreightOrderDTO.UpdateDraftRequest request
     ) {
+        SystemUser user = getLoggedInUser();
+
         return ResponseEntity.ok(
                 ResponseData.builder()
                         .statusCode(200)
                         .message("order.draft.updated")
-                        .data(customerFreightOrderService.updateDraft(orderUuid, request))
+                        .data(customerFreightOrderService.updateDraft(orderUuid, request, user))
                         .build()
         );
     }
@@ -59,11 +66,14 @@ public class CustomerFreightOrderController {
     public ResponseEntity<ResponseData> orderDetail(
             @PathVariable String orderUuid
     ) {
+
+        SystemUser user = getLoggedInUser();
+
         return ResponseEntity.ok(
                 ResponseData.builder()
                         .statusCode(200)
                         .message("order.detail.fetched")
-                        .data(customerFreightOrderService.orderDetail(orderUuid))
+                        .data(customerFreightOrderService.orderDetail(orderUuid, user))
                         .build()
         );
     }
@@ -72,11 +82,38 @@ public class CustomerFreightOrderController {
     public ResponseEntity<ResponseData> placeOrder(
             @PathVariable String orderUuid
     ) {
+
+        SystemUser user = getLoggedInUser();
+
         return ResponseEntity.ok(
                 ResponseData.builder()
                         .statusCode(200)
                         .message("order.placed")
-                        .data(customerFreightOrderService.placeOrder(orderUuid))
+                        .data(customerFreightOrderService.placeOrder(orderUuid, user))
+                        .build()
+        );
+    }
+
+
+    @GetMapping("/draft")
+    public ResponseEntity<ResponseData> getDraftOrder(
+            @RequestParam String categoryUuid,
+            @RequestParam(required = false) String subCategoryUuid
+    ) {
+
+        SystemUser customer = getLoggedInUser();
+
+        return ResponseEntity.ok(
+                ResponseData.builder()
+                        .statusCode(200)
+                        .message("record.fetched")
+                        .data(
+                                customerFreightOrderService.getDraftOrder(
+                                        customer,
+                                        categoryUuid,
+                                        subCategoryUuid
+                                )
+                        )
                         .build()
         );
     }
