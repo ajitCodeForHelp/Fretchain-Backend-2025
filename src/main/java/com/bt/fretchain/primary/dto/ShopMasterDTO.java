@@ -83,7 +83,7 @@ public class ShopMasterDTO {
         @DecimalMax("100.0")
         private BigDecimal commissionPercentage;
 
-        /** Defaults to PENDING on create when not supplied. */
+        /** Only used on create (defaults to PENDING). Later changes go through the approval action. */
         private ShopStatus status;
 
         // UUID of the shop owner, if assigned
@@ -123,6 +123,9 @@ public class ShopMasterDTO {
         private BigDecimal rating;
         private Integer ratingCount;
         private ShopStatus status;
+        private String statusReason;
+        private java.time.LocalDateTime statusChangedAt;
+        private Boolean selfRegistered;
         private String ownerUuid;
         private String ownerName;
         private Boolean active;

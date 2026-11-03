@@ -94,6 +94,7 @@ public class ShopAccessService {
         session.setStoreNameFr(shop.getNameFr());
         session.setLogoUrl(shop.getLogoUrl());
         session.setStatus(shop.getStatus());
+        session.setStatusReason(shop.getStatusReason());
         session.setOwner(staff.isOwner());
         session.setRoleName(staff.getRole() != null ? staff.getRole().getName() : null);
 

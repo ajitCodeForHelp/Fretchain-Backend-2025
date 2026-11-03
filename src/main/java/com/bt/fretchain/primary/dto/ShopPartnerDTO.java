@@ -27,6 +27,7 @@ public class ShopPartnerDTO {
         private String storeNameFr;
         private String logoUrl;
         private ShopStatus status;
+        private String statusReason;
         private String roleName;
         private boolean owner;
         private List<ShopActivity> activities;

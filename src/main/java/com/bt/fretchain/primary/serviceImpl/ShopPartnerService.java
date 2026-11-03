@@ -366,6 +366,12 @@ public class ShopPartnerService {
     /** Creates the owner login (first time) or updates its details / password. */
     @Transactional
     public ShopPartnerDTO.StaffDetail saveOwner(String shopUuid, ShopPartnerDTO.OwnerSave req, SystemUser admin) {
+        return saveOwner(shopUuid, req, admin.getRecordId());
+    }
+
+    /** actorId = admin creating the owner, or null for public self-registration. */
+    @Transactional
+    public ShopPartnerDTO.StaffDetail saveOwner(String shopUuid, ShopPartnerDTO.OwnerSave req, Long actorId) {
         ShopMaster shop = shopRepository.findByUuidAndDeletedFalse(shopUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("shop.notfound"));
 
@@ -377,8 +383,8 @@ public class ShopPartnerService {
                     r.setDescription("Full access to the shop");
                     r.setOwnerRole(true);
                     r.getActivities().addAll(EnumSet.allOf(ShopActivity.class));
-                    r.setCreatedBy(admin.getRecordId());
-                    r.setModifiedBy(admin.getRecordId());
+                    r.setCreatedBy(actorId);
+                    r.setModifiedBy(actorId);
                     return roleRepository.save(r);
                 });
 
@@ -387,22 +393,22 @@ public class ShopPartnerService {
 
         if (owner == null) {
             SystemUser login = loginHelper.create(req.getFullName(), req.getEmail(), req.getMobile(),
-                    req.getPassword(), UserTypeEnum.SHOP_USER, admin.getRecordId());
+                    req.getPassword(), UserTypeEnum.SHOP_USER, actorId);
             owner = new ShopStaff();
             owner.setShop(shop);
             owner.setUser(login);
             owner.setRole(ownerRole);
             owner.setOwner(true);
-            owner.setCreatedBy(admin.getRecordId());
+            owner.setCreatedBy(actorId);
         } else {
             loginHelper.update(owner.getUser(), req.getFullName(), req.getEmail(), req.getMobile(),
-                    req.getPassword(), admin.getRecordId());
+                    req.getPassword(), actorId);
         }
-        owner.setModifiedBy(admin.getRecordId());
+        owner.setModifiedBy(actorId);
         owner = staffRepository.save(owner);
 
         shop.setOwner(owner.getUser());
-        shop.setModifiedBy(admin.getRecordId());
+        shop.setModifiedBy(actorId);
         shopRepository.save(shop);
 
         return toStaffDetail(owner);

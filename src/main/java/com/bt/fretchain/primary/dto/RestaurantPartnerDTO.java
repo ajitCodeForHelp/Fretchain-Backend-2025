@@ -28,6 +28,7 @@ public class RestaurantPartnerDTO {
         private String storeNameFr;
         private String logoUrl;
         private RestaurantStatus status;
+        private String statusReason;
         private String roleName;
         private boolean owner;
         private List<RestaurantActivity> activities;

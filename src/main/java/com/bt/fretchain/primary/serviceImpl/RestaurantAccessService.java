@@ -94,6 +94,7 @@ public class RestaurantAccessService {
         session.setStoreNameFr(restaurant.getNameFr());
         session.setLogoUrl(restaurant.getLogoUrl());
         session.setStatus(restaurant.getStatus());
+        session.setStatusReason(restaurant.getStatusReason());
         session.setOwner(staff.isOwner());
         session.setRoleName(staff.getRole() != null ? staff.getRole().getName() : null);
 

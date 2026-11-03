@@ -368,6 +368,12 @@ public class RestaurantPartnerService {
     /** Creates the owner login (first time) or updates its details / password. */
     @Transactional
     public RestaurantPartnerDTO.StaffDetail saveOwner(String restaurantUuid, RestaurantPartnerDTO.OwnerSave req, SystemUser admin) {
+        return saveOwner(restaurantUuid, req, admin.getRecordId());
+    }
+
+    /** actorId = admin creating the owner, or null for public self-registration. */
+    @Transactional
+    public RestaurantPartnerDTO.StaffDetail saveOwner(String restaurantUuid, RestaurantPartnerDTO.OwnerSave req, Long actorId) {
         RestaurantMaster restaurant = restaurantRepository.findByUuidAndDeletedFalse(restaurantUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("restaurant.notfound"));
 
@@ -379,8 +385,8 @@ public class RestaurantPartnerService {
                     r.setDescription("Full access to the restaurant");
                     r.setOwnerRole(true);
                     r.getActivities().addAll(EnumSet.allOf(RestaurantActivity.class));
-                    r.setCreatedBy(admin.getRecordId());
-                    r.setModifiedBy(admin.getRecordId());
+                    r.setCreatedBy(actorId);
+                    r.setModifiedBy(actorId);
                     return roleRepository.save(r);
                 });
 
@@ -389,22 +395,22 @@ public class RestaurantPartnerService {
 
         if (owner == null) {
             SystemUser login = loginHelper.create(req.getFullName(), req.getEmail(), req.getMobile(),
-                    req.getPassword(), UserTypeEnum.RESTAURANT_USER, admin.getRecordId());
+                    req.getPassword(), UserTypeEnum.RESTAURANT_USER, actorId);
             owner = new RestaurantStaff();
             owner.setRestaurant(restaurant);
             owner.setUser(login);
             owner.setRole(ownerRole);
             owner.setOwner(true);
-            owner.setCreatedBy(admin.getRecordId());
+            owner.setCreatedBy(actorId);
         } else {
             loginHelper.update(owner.getUser(), req.getFullName(), req.getEmail(), req.getMobile(),
-                    req.getPassword(), admin.getRecordId());
+                    req.getPassword(), actorId);
         }
-        owner.setModifiedBy(admin.getRecordId());
+        owner.setModifiedBy(actorId);
         owner = staffRepository.save(owner);
 
         restaurant.setOwner(owner.getUser());
-        restaurant.setModifiedBy(admin.getRecordId());
+        restaurant.setModifiedBy(actorId);
         restaurantRepository.save(restaurant);
 
         return toStaffDetail(owner);

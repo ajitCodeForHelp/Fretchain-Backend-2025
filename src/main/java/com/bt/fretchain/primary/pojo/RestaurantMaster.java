@@ -150,6 +150,17 @@ public class RestaurantMaster extends BaseEntity {
     @Column(nullable = false, length = 20)
     private RestaurantStatus status = RestaurantStatus.PENDING;
 
+    /** Reason given by the admin when rejecting / suspending. Cleared on approval. */
+    @Column(name = "status_reason", length = 500)
+    private String statusReason;
+
+    @Column(name = "status_changed_at")
+    private java.time.LocalDateTime statusChangedAt;
+
+    /** True when created through the public registration page. */
+    @Column(name = "self_registered")
+    private Boolean selfRegistered = false;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id")
     private SystemUser owner;

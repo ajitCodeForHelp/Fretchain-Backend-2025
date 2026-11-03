@@ -7,6 +7,8 @@ import com.bt.fretchain.primary.pojo.SystemUser;
 import com.bt.fretchain.primary.dto.ShopPartnerDTO;
 import com.bt.fretchain.primary.service.ShopMasterService;
 import com.bt.fretchain.primary.serviceImpl.ShopPartnerService;
+import com.bt.fretchain.primary.serviceImpl.ShopRegistrationService;
+import com.bt.fretchain.primary.dto.ShopRegistrationDTO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +23,7 @@ public class ShopMasterController extends _BaseController {
 
     private final ShopMasterService shopService;
     private final ShopPartnerService partnerService;
+    private final ShopRegistrationService registrationService;
 
     @PostMapping("/save")
     public ResponseEntity<ResponseData> save(
@@ -98,6 +101,19 @@ public class ShopMasterController extends _BaseController {
                 .statusCode(200)
                 .message("record.dropdown.fetched")
                 .data(data)
+                .build());
+    }
+
+    /** Approve / reject / suspend (reason required for reject and suspend). */
+    @PatchMapping("/{uuid}/approval")
+    public ResponseEntity<ResponseData> approval(
+            @PathVariable String uuid,
+            @Valid @RequestBody ShopRegistrationDTO.ApprovalUpdate request) {
+
+        return ResponseEntity.ok(ResponseData.builder()
+                .statusCode(200)
+                .message("status.updated")
+                .data(registrationService.changeStatus(uuid, request, getLoggedInUser()))
                 .build());
     }
 

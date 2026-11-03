@@ -90,7 +90,7 @@ public class RestaurantMasterDTO {
         @DecimalMin("0.0")
         private BigDecimal costForTwo;
 
-        /** Defaults to PENDING on create when not supplied. */
+        /** Only used on create (defaults to PENDING). Later changes go through the approval action. */
         private RestaurantStatus status;
 
         // UUID of the restaurant owner, if assigned
@@ -132,6 +132,9 @@ public class RestaurantMasterDTO {
         private BigDecimal rating;
         private Integer ratingCount;
         private RestaurantStatus status;
+        private String statusReason;
+        private java.time.LocalDateTime statusChangedAt;
+        private Boolean selfRegistered;
         private String ownerUuid;
         private String ownerName;
         private Boolean active;

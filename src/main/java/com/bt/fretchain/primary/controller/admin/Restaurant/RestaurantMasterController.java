@@ -7,6 +7,8 @@ import com.bt.fretchain.primary.pojo.SystemUser;
 import com.bt.fretchain.primary.dto.RestaurantPartnerDTO;
 import com.bt.fretchain.primary.service.RestaurantMasterService;
 import com.bt.fretchain.primary.serviceImpl.RestaurantPartnerService;
+import com.bt.fretchain.primary.serviceImpl.RestaurantRegistrationService;
+import com.bt.fretchain.primary.dto.RestaurantRegistrationDTO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +23,7 @@ public class RestaurantMasterController extends _BaseController {
 
     private final RestaurantMasterService restaurantService;
     private final RestaurantPartnerService partnerService;
+    private final RestaurantRegistrationService registrationService;
 
     @PostMapping("/save")
     public ResponseEntity<ResponseData> save(
@@ -100,6 +103,19 @@ public class RestaurantMasterController extends _BaseController {
                 .data(data)
                 .build());
     }
+    /** Approve / reject / suspend (reason required for reject and suspend). */
+    @PatchMapping("/{uuid}/approval")
+    public ResponseEntity<ResponseData> approval(
+            @PathVariable String uuid,
+            @Valid @RequestBody RestaurantRegistrationDTO.ApprovalUpdate request) {
+
+        return ResponseEntity.ok(ResponseData.builder()
+                .statusCode(200)
+                .message("status.updated")
+                .data(registrationService.changeStatus(uuid, request, getLoggedInUser()))
+                .build());
+    }
+
     /** Owner login of the restaurant (null when not created yet). */
     @GetMapping("/{uuid}/owner")
     public ResponseEntity<ResponseData> getOwner(@PathVariable String uuid) {
