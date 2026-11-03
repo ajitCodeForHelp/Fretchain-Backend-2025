@@ -56,7 +56,9 @@ public class PartnerShopCategoryController extends _BaseController {
     @PostMapping("/list")
     @Transactional(readOnly = true)
     public ResponseEntity<ResponseData> list(@RequestBody ShopCategoryDTO.ListOrSearchData request) {
-        ShopStaff staff = access.require(getLoggedInUser(), ShopActivity.CATEGORY_VIEW);
+        // also used by the item form's dropdowns: allowed for anyone who may add / edit items
+        ShopStaff staff = access.requireAny(getLoggedInUser(),
+                ShopActivity.CATEGORY_VIEW, ShopActivity.ITEM_ADD, ShopActivity.ITEM_EDIT, ShopActivity.SUBCATEGORY_ADD, ShopActivity.SUBCATEGORY_EDIT);
         request.setShopUuid(staff.getShop().getUuid());
         return ok(service.getListData(request), "record.list.fetched");
     }

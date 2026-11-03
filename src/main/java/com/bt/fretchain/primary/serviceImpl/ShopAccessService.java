@@ -81,6 +81,17 @@ public class ShopAccessService {
         return staff;
     }
 
+    /** Current staff with at least one of the activities (e.g. a dropdown used by several screens). */
+    public ShopStaff requireAny(SystemUser user, ShopActivity... activities) {
+        ShopStaff staff = currentStaff(user);
+        for (ShopActivity a : activities) {
+            if (has(staff, a)) {
+                return staff;
+            }
+        }
+        throw new ForbiddenException("access.denied");
+    }
+
     /** A record of another shop is reported as "not found" rather than leaking its existence. */
     public void ensureSameShop(String recordShopUuid, ShopStaff staff) {
         if (recordShopUuid == null || !recordShopUuid.equals(staff.getShop().getUuid())) {

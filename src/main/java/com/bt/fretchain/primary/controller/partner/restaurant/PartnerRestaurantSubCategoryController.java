@@ -56,7 +56,9 @@ public class PartnerRestaurantSubCategoryController extends _BaseController {
     @PostMapping("/list")
     @Transactional(readOnly = true)
     public ResponseEntity<ResponseData> list(@RequestBody RestaurantSubCategoryDTO.ListOrSearchData request) {
-        RestaurantStaff staff = access.require(getLoggedInUser(), RestaurantActivity.SUBCATEGORY_VIEW);
+        // also used by the item form's dropdowns: allowed for anyone who may add / edit items
+        RestaurantStaff staff = access.requireAny(getLoggedInUser(),
+                RestaurantActivity.SUBCATEGORY_VIEW, RestaurantActivity.ITEM_ADD, RestaurantActivity.ITEM_EDIT);
         request.setRestaurantUuid(staff.getRestaurant().getUuid());
         return ok(service.getListData(request), "record.list.fetched");
     }

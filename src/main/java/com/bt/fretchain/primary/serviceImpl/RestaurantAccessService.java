@@ -81,6 +81,17 @@ public class RestaurantAccessService {
         return staff;
     }
 
+    /** Current staff with at least one of the activities (e.g. a dropdown used by several screens). */
+    public RestaurantStaff requireAny(SystemUser user, RestaurantActivity... activities) {
+        RestaurantStaff staff = currentStaff(user);
+        for (RestaurantActivity a : activities) {
+            if (has(staff, a)) {
+                return staff;
+            }
+        }
+        throw new ForbiddenException("access.denied");
+    }
+
     /** A record of another restaurant is reported as "not found" rather than leaking its existence. */
     public void ensureSameRestaurant(String recordRestaurantUuid, RestaurantStaff staff) {
         if (recordRestaurantUuid == null || !recordRestaurantUuid.equals(staff.getRestaurant().getUuid())) {
