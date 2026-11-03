@@ -13,6 +13,9 @@ public interface ShopMasterMapper {
     @Mapping(target = "globalCategories", ignore = true)
     @Mapping(target = "rating", ignore = true)
     @Mapping(target = "ratingCount", ignore = true)
+    @Mapping(target = "statusReason", ignore = true)
+    @Mapping(target = "statusChangedAt", ignore = true)
+    @Mapping(target = "selfRegistered", ignore = true)
     ShopMaster toEntity(ShopMasterDTO.SaveOrUpdate dto);
 
     @Mapping(target = "ownerUuid", source = "owner.uuid")
@@ -23,6 +26,10 @@ public interface ShopMasterMapper {
     @Mapping(target = "globalCategories", ignore = true)
     @Mapping(target = "rating", ignore = true)
     @Mapping(target = "ratingCount", ignore = true)
+    @Mapping(target = "statusReason", ignore = true)
+    @Mapping(target = "statusChangedAt", ignore = true)
+    @Mapping(target = "selfRegistered", ignore = true)
+    @Mapping(target = "status", ignore = true)
     void updateEntityFromDto(
             ShopMasterDTO.SaveOrUpdate dto,
             @MappingTarget ShopMaster entity

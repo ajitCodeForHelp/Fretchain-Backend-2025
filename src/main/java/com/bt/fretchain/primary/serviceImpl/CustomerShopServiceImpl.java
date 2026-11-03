@@ -2,15 +2,12 @@ package com.bt.fretchain.primary.serviceImpl;
 
 import com.bt.fretchain.bean.DataTableResponsePacket;
 import com.bt.fretchain.exception.ResourceNotFoundException;
-import com.bt.fretchain.primary.dto.CustomerMarketplaceDTO;
-import com.bt.fretchain.primary.dto.CustomerMarketplaceDTO.*;
-import com.bt.fretchain.primary.mapper.CustomerMarketplaceMapper;
+import com.bt.fretchain.primary.dto.CustomerShopDTO.*;
+import com.bt.fretchain.primary.mapper.CustomerShopMapper;
 import com.bt.fretchain.primary.pojo.*;
-import com.bt.fretchain.primary.pojo.enums.BusinessType;
-import com.bt.fretchain.primary.pojo.enums.FoodType;
 import com.bt.fretchain.primary.pojo.enums.ShopStatus;
 import com.bt.fretchain.primary.repository.*;
-import com.bt.fretchain.primary.service.CustomerMarketplaceService;
+import com.bt.fretchain.primary.service.CustomerShopService;
 import com.bt.fretchain.utils.GeoUtils;
 import com.bt.fretchain.utils.PaginationUtils;
 import com.bt.fretchain.utils.SearchUtils;
@@ -33,9 +30,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class CustomerMarketplaceServiceImpl implements CustomerMarketplaceService {
+public class CustomerShopServiceImpl implements CustomerShopService {
 
-    /** Max nearby stores whose items are considered by the global item search. */
+    /** Max nearby shops whose items are considered by the global item search. */
     private static final int MAX_SHOPS_FOR_ITEM_SEARCH = 200;
 
     private static final int MAX_CATEGORY_SEARCH_RESULTS = 10;
@@ -48,7 +45,7 @@ public class CustomerMarketplaceServiceImpl implements CustomerMarketplaceServic
     private final ShopCategoryRepository categoryRepository;
     private final ShopSubCategoryRepository subCategoryRepository;
     private final ShopItemRepository itemRepository;
-    private final CustomerMarketplaceMapper mapper;
+    private final CustomerShopMapper mapper;
 
     /** Time zone used for "open now". Empty = server default. e.g. Africa/Douala */
     @Value("${marketplace.time-zone:}")
@@ -59,35 +56,31 @@ public class CustomerMarketplaceServiceImpl implements CustomerMarketplaceServic
     // =====================================================================
 
     @Override
-    public List<GlobalCategoryCard> getGlobalCategories(BusinessType businessType) {
+    public List<GlobalCategoryCard> getGlobalCategories() {
         return globalCategoryRepository
-                .findByBusinessTypeAndActiveTrueAndDeletedFalseOrderByDisplayOrderAscNameEnAsc(
-                        businessType)
+                .findByActiveTrueAndDeletedFalseOrderByDisplayOrderAscNameEnAsc()
                 .stream()
                 .map(mapper::toGlobalCategoryCard)
                 .toList();
     }
 
     // =====================================================================
-    // 2. Nearby stores
+    // 2. Nearby shops
     // =====================================================================
 
     @Override
-    public DataTableResponsePacket<ShopCard> getNearbyShops(
-            BusinessType businessType, NearbyShopRequest request) {
+    public DataTableResponsePacket<ShopCard> getNearbyShops(NearbyShopRequest request) {
 
         int pageNumber = request.getPageNumber() == null ? 0 : Math.max(0, request.getPageNumber());
         int pageSize = request.getPageSize() == null ? 20 : Math.max(1, Math.min(50, request.getPageSize()));
 
         NearbyShopCriteria criteria = new NearbyShopCriteria(
-                businessType,
                 request.getLatitude(),
                 request.getLongitude(),
                 radius(request.getRadiusKm()),
                 blankToNull(request.getGlobalCategoryUuid()),
                 SearchUtils.containsPattern(request.getSearch()),
                 Boolean.TRUE.equals(request.getOpenNowOnly()),
-                Boolean.TRUE.equals(request.getVegOnly()),
                 request.getMinRating(),
                 request.getSortBy(),
                 now(),
@@ -105,47 +98,28 @@ public class CustomerMarketplaceServiceImpl implements CustomerMarketplaceServic
     }
 
     // =====================================================================
-    // 3. Store page (header + category tree)
+    // 3. Shop page (header + category tree)
     // =====================================================================
 
     @Override
-    public ShopDetailResponse getShopDetail(
-            BusinessType businessType, String shopUuid,
-            Double latitude, Double longitude) {
+    public ShopDetailResponse getShopDetail(String shopUuid, Double latitude, Double longitude) {
 
-        ShopMaster shop = findVisibleShop(businessType, shopUuid);
+        ShopMaster shop = findVisibleShop(shopUuid);
 
         ShopDetailResponse response = new ShopDetailResponse();
         response.setShop(toShopCard(shop, latitude, longitude));
-        response.setCategories(buildCategoryTree(shop, null));
-        return response;
-    }
-
-    /** Whole menu with items in one call - intended for restaurants (small menus). */
-    @Override
-    public ShopDetailResponse getShopMenu(
-            BusinessType businessType, String shopUuid,
-            Double latitude, Double longitude) {
-
-        ShopMaster shop = findVisibleShop(businessType, shopUuid);
-
-        List<ShopItem> items = itemRepository.findVisibleMenuItems(shop.getRecordId());
-
-        ShopDetailResponse response = new ShopDetailResponse();
-        response.setShop(toShopCard(shop, latitude, longitude));
-        response.setCategories(buildCategoryTree(shop, items));
+        response.setCategories(buildCategoryTree(shop));
         return response;
     }
 
     // =====================================================================
-    // 4. Items of a store (by category / subcategory / text)
+    // 4. Items of a shop (by category / subcategory / text)
     // =====================================================================
 
     @Override
-    public DataTableResponsePacket<ItemCard> getShopItems(
-            BusinessType businessType, String shopUuid, ShopItemsRequest request) {
+    public DataTableResponsePacket<ItemCard> getShopItems(String shopUuid, ShopItemsRequest request) {
 
-        ShopMaster shop = findVisibleShop(businessType, shopUuid);
+        ShopMaster shop = findVisibleShop(shopUuid);
 
         int pageNumber = request.getPageNumber() == null ? 0 : Math.max(0, request.getPageNumber());
         int pageSize = request.getPageSize() == null ? 20 : Math.max(1, Math.min(100, request.getPageSize()));
@@ -162,9 +136,6 @@ public class CustomerMarketplaceServiceImpl implements CustomerMarketplaceServic
             }
             if (request.getSubCategoryUuid() != null && !request.getSubCategoryUuid().isBlank()) {
                 predicates.add(cb.equal(subCategory.get("uuid"), request.getSubCategoryUuid()));
-            }
-            if (Boolean.TRUE.equals(request.getVegOnly())) {
-                predicates.add(cb.equal(root.get("foodType"), FoodType.VEG));
             }
 
             String pattern = SearchUtils.containsPattern(request.getSearch());
@@ -183,53 +154,49 @@ public class CustomerMarketplaceServiceImpl implements CustomerMarketplaceServic
     }
 
     // =====================================================================
-    // 5. Search box: "milk", "pizza", "Dominos", "pharmacy"
+    // 5. Search box: "milk", "paracetamol", "Fresh Mart", "pharmacy"
     // =====================================================================
 
     @Override
-    public SearchResponse search(BusinessType businessType, SearchRequest request) {
+    public SearchResponse search(SearchRequest request) {
 
         String pattern = SearchUtils.containsPattern(request.getQuery());
         double radius = radius(request.getRadiusKm());
         LocalTime now = now();
-        boolean vegOnly = Boolean.TRUE.equals(request.getVegOnly());
 
         SearchResponse response = new SearchResponse();
 
         // (a) Global categories by name -> tap opens nearby list filtered by category
         response.setCategories(globalCategoryRepository
-                .searchActive(businessType, pattern,
-                        PageRequest.of(0, MAX_CATEGORY_SEARCH_RESULTS))
+                .searchActive(pattern, PageRequest.of(0, MAX_CATEGORY_SEARCH_RESULTS))
                 .stream()
                 .map(mapper::toGlobalCategoryCard)
                 .toList());
 
-        // (b) Nearby stores whose name or global category matches
+        // (b) Nearby shops whose name or global category matches
         int shopLimit = request.getShopLimit() == null ? 10 : Math.max(1, Math.min(50, request.getShopLimit()));
         response.setShops(toShopCards(shopRepository.findNearbyShops(new NearbyShopCriteria(
-                businessType, request.getLatitude(), request.getLongitude(), radius,
-                null, pattern, false, vegOnly, null, ShopSortBy.RELEVANCE, now,
+                request.getLatitude(), request.getLongitude(), radius,
+                null, pattern, false, null, ShopSortBy.RELEVANCE, now,
                 0, shopLimit))));
 
-        // (c) Items matching the text in any nearby store, nearest open store first
-        response.setItems(searchItemsInNearbyShops(
-                businessType, request, pattern, radius, now, vegOnly));
+        // (c) Items matching the text in any nearby shop, nearest open shop first
+        response.setItems(searchItemsInNearbyShops(request, pattern, radius, now));
 
         return response;
     }
 
     private DataTableResponsePacket<ItemCard> searchItemsInNearbyShops(
-            BusinessType businessType, SearchRequest request, String pattern,
-            double radius, LocalTime now, boolean vegOnly) {
+            SearchRequest request, String pattern, double radius, LocalTime now) {
 
         int pageNumber = request.getPageNumber() == null ? 0 : Math.max(0, request.getPageNumber());
         int pageSize = request.getPageSize() == null ? 20 : Math.max(1, Math.min(50, request.getPageSize()));
         PageRequest pageRequest = PageRequest.of(pageNumber, pageSize);
 
-        // Step 1: which stores can deliver here (ordered: open first, then nearest)
+        // Step 1: which shops can deliver here (ordered: open first, then nearest)
         List<NearbyShopRow> nearby = shopRepository.findNearbyShops(new NearbyShopCriteria(
-                businessType, request.getLatitude(), request.getLongitude(), radius,
-                null, null, false, false, null, ShopSortBy.RELEVANCE, now,
+                request.getLatitude(), request.getLongitude(), radius,
+                null, null, false, null, ShopSortBy.RELEVANCE, now,
                 0, MAX_SHOPS_FOR_ITEM_SEARCH));
 
         if (nearby.isEmpty()) {
@@ -241,7 +208,7 @@ public class CustomerMarketplaceServiceImpl implements CustomerMarketplaceServic
         Map<Long, NearbyShopRow> rowByShop = nearby.stream()
                 .collect(Collectors.toMap(NearbyShopRow::shopId, Function.identity()));
 
-        // Step 2: matching items inside those stores
+        // Step 2: matching items inside those shops
         Specification<ShopItem> spec = (root, query, cb) -> {
             Join<ShopItem, ShopCategory> category = root.join("category");
             Join<ShopItem, ShopSubCategory> subCategory = root.join("subCategory", JoinType.LEFT);
@@ -250,11 +217,8 @@ public class CustomerMarketplaceServiceImpl implements CustomerMarketplaceServic
             List<Predicate> predicates = visibleItemPredicates(root, category, subCategory, cb);
             predicates.add(shopId.in(shopIds));
             predicates.add(itemTextMatch(root, category, subCategory, cb, pattern));
-            if (vegOnly) {
-                predicates.add(cb.equal(root.get("foodType"), FoodType.VEG));
-            }
 
-            // Order by the store's position in the nearby list, then featured, then name
+            // Order by the shop's position in the nearby list, then featured, then name
             CriteriaBuilder.SimpleCase<Long, Integer> shopRank = cb.selectCase(shopId);
             for (int i = 0; i < shopIds.size(); i++) {
                 shopRank.when(shopIds.get(i), i);
@@ -279,13 +243,11 @@ public class CustomerMarketplaceServiceImpl implements CustomerMarketplaceServic
     // Helpers
     // =====================================================================
 
-    private ShopMaster findVisibleShop(BusinessType businessType, String shopUuid) {
+    private ShopMaster findVisibleShop(String shopUuid) {
         ShopMaster shop = shopRepository.findByUuidAndDeletedFalse(shopUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("shop.notfound"));
 
-        if (!shop.isActive()
-                || shop.getStatus() != ShopStatus.APPROVED
-                || shop.getBusinessType() != businessType) {
+        if (!shop.isActive() || shop.getStatus() != ShopStatus.APPROVED) {
             throw new ResourceNotFoundException("shop.notfound");
         }
         return shop;
@@ -321,7 +283,8 @@ public class CustomerMarketplaceServiceImpl implements CustomerMarketplaceServic
 
     private ShopCard toShopCard(ShopMaster shop, Double latitude, Double longitude) {
         ShopCard card = mapper.toShopCard(shop);
-        card.setOpenNow(isOpenNow(shop, now()));
+        card.setOpenNow(isOpenNow(shop.getAcceptingOrders(),
+                shop.getOpeningTime(), shop.getClosingTime(), now()));
 
         if (latitude != null && longitude != null
                 && shop.getLatitude() != null && shop.getLongitude() != null) {
@@ -339,10 +302,9 @@ public class CustomerMarketplaceServiceImpl implements CustomerMarketplaceServic
 
     /**
      * Category -> subcategory tree with item counts. Categories / subcategories
-     * without visible items are hidden. When {@code items} is given, items are
-     * attached too (full menu).
+     * without visible items are hidden.
      */
-    private List<MenuCategory> buildCategoryTree(ShopMaster shop, List<ShopItem> items) {
+    private List<ShopCategoryNode> buildCategoryTree(ShopMaster shop) {
 
         // counts[categoryId][subCategoryId or null] = n
         Map<Long, Map<Long, Long>> counts = new HashMap<>();
@@ -359,21 +321,7 @@ public class CustomerMarketplaceServiceImpl implements CustomerMarketplaceServic
                         LinkedHashMap::new,
                         Collectors.toList()));
 
-        Map<Long, List<ShopItem>> itemsByCategoryOnly = new HashMap<>();
-        Map<Long, List<ShopItem>> itemsBySubCategory = new HashMap<>();
-        if (items != null) {
-            for (ShopItem item : items) {
-                if (item.getSubCategory() == null) {
-                    itemsByCategoryOnly.computeIfAbsent(
-                            item.getCategory().getRecordId(), k -> new ArrayList<>()).add(item);
-                } else {
-                    itemsBySubCategory.computeIfAbsent(
-                            item.getSubCategory().getRecordId(), k -> new ArrayList<>()).add(item);
-                }
-            }
-        }
-
-        List<MenuCategory> tree = new ArrayList<>();
+        List<ShopCategoryNode> tree = new ArrayList<>();
 
         for (ShopCategory category : categoryRepository.findActiveByShopId(shop.getRecordId())) {
             Map<Long, Long> categoryCounts = counts.getOrDefault(category.getRecordId(), Map.of());
@@ -382,7 +330,7 @@ public class CustomerMarketplaceServiceImpl implements CustomerMarketplaceServic
                 continue;
             }
 
-            MenuCategory node = mapper.toMenuCategory(category);
+            ShopCategoryNode node = mapper.toCategoryNode(category);
             node.setItemCount(total);
             node.setSubCategories(new ArrayList<>());
 
@@ -391,26 +339,13 @@ public class CustomerMarketplaceServiceImpl implements CustomerMarketplaceServic
                 if (subCount == 0) {
                     continue;
                 }
-                MenuSubCategory subNode = mapper.toMenuSubCategory(sub);
+                ShopSubCategoryNode subNode = mapper.toSubCategoryNode(sub);
                 subNode.setItemCount(subCount);
-                if (items != null) {
-                    subNode.setItems(toItemCards(
-                            itemsBySubCategory.getOrDefault(sub.getRecordId(), List.of()), shop));
-                }
                 node.getSubCategories().add(subNode);
-            }
-
-            if (items != null) {
-                node.setItems(toItemCards(
-                        itemsByCategoryOnly.getOrDefault(category.getRecordId(), List.of()), shop));
             }
             tree.add(node);
         }
         return tree;
-    }
-
-    private List<ItemCard> toItemCards(List<ShopItem> items, ShopMaster shop) {
-        return items.stream().map(i -> toItemCard(i, shop, null)).toList();
     }
 
     private ItemCard toItemCard(ShopItem item, ShopMaster shop, Double distanceKm) {
@@ -418,12 +353,8 @@ public class CustomerMarketplaceServiceImpl implements CustomerMarketplaceServic
         card.setShopUuid(shop.getUuid());
         card.setShopName(shop.getNameEn());
         card.setDistanceKm(distanceKm);
-
-        // Restaurants cook to order - stock quantity is not tracked for them
-        boolean tracksStock = shop.getBusinessType() != BusinessType.RESTAURANT;
-        boolean inStock = Boolean.TRUE.equals(item.getAvailable())
-                && (!tracksStock || (item.getStockQuantity() != null && item.getStockQuantity() > 0));
-        card.setInStock(inStock);
+        card.setInStock(Boolean.TRUE.equals(item.getAvailable())
+                && item.getStockQuantity() != null && item.getStockQuantity() > 0);
         return card;
     }
 
@@ -487,12 +418,12 @@ public class CustomerMarketplaceServiceImpl implements CustomerMarketplaceServic
     }
 
     /** Same rule as the SQL in ShopMasterRepositoryImpl (handles past-midnight closing). */
-    private boolean isOpenNow(ShopMaster shop, LocalTime now) {
-        if (Boolean.FALSE.equals(shop.getAcceptingOrders())) {
+    private static boolean isOpenNow(
+            Boolean acceptingOrders, LocalTime open, LocalTime close, LocalTime now) {
+
+        if (Boolean.FALSE.equals(acceptingOrders)) {
             return false;
         }
-        LocalTime open = shop.getOpeningTime();
-        LocalTime close = shop.getClosingTime();
         if (open == null || close == null) {
             return true;
         }

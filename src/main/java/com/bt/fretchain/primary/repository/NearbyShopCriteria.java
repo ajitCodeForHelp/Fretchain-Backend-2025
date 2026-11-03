@@ -1,7 +1,6 @@
 package com.bt.fretchain.primary.repository;
 
-import com.bt.fretchain.primary.dto.CustomerMarketplaceDTO.ShopSortBy;
-import com.bt.fretchain.primary.pojo.enums.BusinessType;
+import com.bt.fretchain.primary.dto.CustomerShopDTO.ShopSortBy;
 
 import java.math.BigDecimal;
 import java.time.LocalTime;
@@ -13,14 +12,12 @@ import java.time.LocalTime;
  * @param now           current local time, used for the "open now" calculation
  */
 public record NearbyShopCriteria(
-        BusinessType businessType,
         double latitude,
         double longitude,
         double radiusKm,
         String globalCategoryUuid,
         String searchPattern,
         boolean openNowOnly,
-        boolean vegOnly,
         BigDecimal minRating,
         ShopSortBy sortBy,
         LocalTime now,

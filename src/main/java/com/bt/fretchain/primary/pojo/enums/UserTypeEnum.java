@@ -13,5 +13,11 @@ public enum UserTypeEnum {
 
     VENDOR,
 
-    STAFF
+    STAFF,
+
+    /** Login belonging to a shop (owner or staff); permissions come from ShopRole. */
+    SHOP_USER,
+
+    /** Login belonging to a restaurant (owner or staff); permissions come from RestaurantRole. */
+    RESTAURANT_USER
 }

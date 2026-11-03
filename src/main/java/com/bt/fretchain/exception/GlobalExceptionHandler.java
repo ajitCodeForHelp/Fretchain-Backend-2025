@@ -45,6 +45,16 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ResponseData> handleForbidden(ForbiddenException e) {
+        return ResponseEntity.ok(
+                ResponseData.builder()
+                        .statusCode(403)
+                        .message(e.getMessage())
+                        .build()
+        );
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ResponseData> handleGeneric(Exception e) {
         log.error("Unexpected error", e);

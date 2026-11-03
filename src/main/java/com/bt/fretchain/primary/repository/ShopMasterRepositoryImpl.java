@@ -1,6 +1,6 @@
 package com.bt.fretchain.primary.repository;
 
-import com.bt.fretchain.primary.dto.CustomerMarketplaceDTO.ShopSortBy;
+import com.bt.fretchain.primary.dto.CustomerShopDTO.ShopSortBy;
 import com.bt.fretchain.primary.pojo.enums.ShopStatus;
 import com.bt.fretchain.utils.GeoUtils;
 import jakarta.persistence.EntityManager;
@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Native MySQL implementation of the nearby-store lookup.
+ * Native MySQL implementation of the nearby-shop lookup.
  *
  * 1. Bounding box on latitude/longitude (index friendly) removes far away rows.
  * 2. Haversine gives the exact distance for the remaining rows.
@@ -95,12 +95,10 @@ public class ShopMasterRepositoryImpl implements ShopMasterRepositoryCustom {
                 .append("SELECT s.record_id AS shop_id, ")
                 .append(DISTANCE_EXPR).append(" AS distance_km, ")
                 .append(OPEN_NOW_EXPR).append(" AS open_now, ")
-                .append("s.delivery_radius_km, s.rating, s.avg_preparation_minutes, ")
-                .append("s.cost_for_two ")
+                .append("s.delivery_radius_km, s.rating, s.avg_preparation_minutes ")
                 .append("FROM shop_master s ")
                 .append("WHERE s.deleted = 0 AND s.active = 1 ")
                 .append("AND s.status = '").append(ShopStatus.APPROVED.name()).append("' ")
-                .append("AND s.business_type = :businessType ")
                 .append("AND s.latitude IS NOT NULL AND s.longitude IS NOT NULL ")
                 .append("AND s.latitude BETWEEN :minLat AND :maxLat ")
                 .append("AND s.longitude BETWEEN :minLng AND :maxLng ");
@@ -128,10 +126,6 @@ public class ShopMasterRepositoryImpl implements ShopMasterRepositoryCustom {
                                    OR LOWER(g2.name_fr) LIKE :search ESCAPE '!')))\s""");
         }
 
-        if (c.vegOnly()) {
-            sql.append("AND s.food_type = 'VEG' ");
-        }
-
         if (c.minRating() != null) {
             sql.append("AND s.rating >= :minRating ");
         }
@@ -149,7 +143,7 @@ public class ShopMasterRepositoryImpl implements ShopMasterRepositoryCustom {
         return where;
     }
 
-    /** Only whitelisted SQL fragments - never user input. Open stores always first. */
+    /** Only whitelisted SQL fragments - never user input. Open shops always first. */
     private String orderBy(ShopSortBy sortBy) {
         String eta = "(COALESCE(t.avg_preparation_minutes, "
                 + GeoUtils.DEFAULT_PREPARATION_MINUTES + ") + t.distance_km * "
@@ -159,8 +153,6 @@ public class ShopMasterRepositoryImpl implements ShopMasterRepositoryCustom {
             case DISTANCE, RELEVANCE -> "t.distance_km ASC";
             case RATING -> "t.rating IS NULL, t.rating DESC, t.distance_km ASC";
             case DELIVERY_TIME -> eta + " ASC, t.distance_km ASC";
-            case COST_LOW_TO_HIGH -> "t.cost_for_two IS NULL, t.cost_for_two ASC, t.distance_km ASC";
-            case COST_HIGH_TO_LOW -> "t.cost_for_two IS NULL, t.cost_for_two DESC, t.distance_km ASC";
         };
 
         // shop_id as final tie-breaker keeps paging stable
@@ -173,7 +165,6 @@ public class ShopMasterRepositoryImpl implements ShopMasterRepositoryCustom {
         query.setParameter("lat", c.latitude());
         query.setParameter("lng", c.longitude());
         query.setParameter("now", c.now());
-        query.setParameter("businessType", c.businessType().name());
         query.setParameter("minLat", box[0]);
         query.setParameter("maxLat", box[1]);
         query.setParameter("minLng", box[2]);

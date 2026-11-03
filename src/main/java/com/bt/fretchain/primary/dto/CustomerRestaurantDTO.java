@@ -2,7 +2,6 @@ package com.bt.fretchain.primary.dto;
 
 import com.bt.fretchain.bean.DataTableResponsePacket;
 import com.bt.fretchain.bean.KeyValueDto;
-import com.bt.fretchain.primary.pojo.enums.BusinessType;
 import com.bt.fretchain.primary.pojo.enums.FoodType;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
@@ -13,18 +12,15 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Customer side DTOs for both Shops and Restaurants.
- * The business type comes from the URL: /customer/api/marketplace/{shop|restaurant}/...
- */
-public class CustomerMarketplaceDTO {
+/** Customer side DTOs for the Restaurant module (/customer/api/restaurant/...). */
+public class CustomerRestaurantDTO {
 
     // =====================================================================
     // Sorting options
     // =====================================================================
 
-    public enum ShopSortBy {
-        /** Open stores first, then nearest. Default. */
+    public enum RestaurantSortBy {
+        /** Open restaurants first, then nearest. Default. */
         RELEVANCE,
         DISTANCE,
         RATING,
@@ -33,8 +29,8 @@ public class CustomerMarketplaceDTO {
         COST_HIGH_TO_LOW
     }
 
-    public enum ItemSortBy {
-        /** Featured first, then the store's own display order. Default. */
+    public enum DishSortBy {
+        /** Featured (bestseller) first, then the restaurant's own display order. Default. */
         RELEVANCE,
         PRICE_LOW_TO_HIGH,
         PRICE_HIGH_TO_LOW,
@@ -45,7 +41,7 @@ public class CustomerMarketplaceDTO {
     // Requests
     // =====================================================================
 
-    /** Common location part of every customer request. */
+    /** Common location part of customer requests. */
     @Getter
     @Setter
     public static class LocationRequest {
@@ -66,28 +62,32 @@ public class CustomerMarketplaceDTO {
         private Double radiusKm = 10.0;
     }
 
-    /** Step 1/2: list nearby stores, optionally filtered by a global category. */
+    /** Nearby restaurants, optionally filtered by cuisine. */
     @Getter
     @Setter
-    public static class NearbyShopRequest extends LocationRequest {
+    public static class NearbyRestaurantRequest extends LocationRequest {
 
-        /** Filter: only stores assigned to this global category (chip on home screen). */
+        /** Filter: only restaurants serving this cuisine (chip on home screen). */
         private String globalCategoryUuid;
 
-        /** Filter: store name or global category name contains this text. */
+        /** Filter: restaurant name or cuisine name contains this text. */
         @Size(max = 100)
         private String search;
 
         private Boolean openNowOnly = false;
 
-        /** Restaurants: only pure-veg restaurants. */
+        /** Only pure-veg restaurants. */
         private Boolean vegOnly = false;
 
         @DecimalMin("0.0")
         @DecimalMax("5.0")
         private BigDecimal minRating;
 
-        private ShopSortBy sortBy = ShopSortBy.RELEVANCE;
+        /** Filter: cost for two at most this amount. */
+        @DecimalMin("0.0")
+        private BigDecimal maxCostForTwo;
+
+        private RestaurantSortBy sortBy = RestaurantSortBy.RELEVANCE;
 
         @Min(0)
         private Integer pageNumber = 0;
@@ -97,10 +97,10 @@ public class CustomerMarketplaceDTO {
         private Integer pageSize = 20;
     }
 
-    /** Step 3: items of one store, filtered by its category / subcategory. */
+    /** Dishes of one restaurant, filtered by menu section. */
     @Getter
     @Setter
-    public static class ShopItemsRequest {
+    public static class DishRequest {
 
         private String categoryUuid;
         private String subCategoryUuid;
@@ -108,10 +108,10 @@ public class CustomerMarketplaceDTO {
         @Size(max = 100)
         private String search;
 
-        /** Only VEG items. */
+        /** Only VEG dishes. */
         private Boolean vegOnly = false;
 
-        private ItemSortBy sortBy = ItemSortBy.RELEVANCE;
+        private DishSortBy sortBy = DishSortBy.RELEVANCE;
 
         @Min(0)
         private Integer pageNumber = 0;
@@ -121,7 +121,7 @@ public class CustomerMarketplaceDTO {
         private Integer pageSize = 20;
     }
 
-    /** Global search box: "milk", "pizza", "Dominos", "pharmacy"... */
+    /** Global search box: "pizza", "paneer tikka", "Dominos", "biryani"... */
     @Getter
     @Setter
     public static class SearchRequest extends LocationRequest {
@@ -132,12 +132,12 @@ public class CustomerMarketplaceDTO {
 
         private Boolean vegOnly = false;
 
-        /** Max stores returned in the "stores" section. */
+        /** Max restaurants returned in the "restaurants" section. */
         @Min(1)
         @Max(50)
-        private Integer shopLimit = 10;
+        private Integer restaurantLimit = 10;
 
-        /** Paging applies to the "items" section. */
+        /** Paging applies to the "dishes" section. */
         @Min(0)
         private Integer pageNumber = 0;
 
@@ -152,20 +152,17 @@ public class CustomerMarketplaceDTO {
 
     @Getter
     @Setter
-    public static class GlobalCategoryCard {
+    public static class CuisineCard {
         private String uuid;
-        private BusinessType businessType;
         private String nameEn;
         private String nameFr;
         private String imageUrl;
     }
 
-    /** One row in the nearby stores list. */
     @Getter
     @Setter
-    public static class ShopCard {
+    public static class RestaurantCard {
         private String uuid;
-        private BusinessType businessType;
         private String nameEn;
         private String nameFr;
         private String logoUrl;
@@ -174,6 +171,7 @@ public class CustomerMarketplaceDTO {
         private String city;
         private BigDecimal latitude;
         private BigDecimal longitude;
+        /** Cuisines. */
         private List<KeyValueDto> globalCategories;
 
         private Double distanceKm;
@@ -196,7 +194,7 @@ public class CustomerMarketplaceDTO {
 
     @Getter
     @Setter
-    public static class ItemCard {
+    public static class DishCard {
         private String uuid;
         private String nameEn;
         private String nameFr;
@@ -205,21 +203,21 @@ public class CustomerMarketplaceDTO {
         private String imageUrl;
         private BigDecimal price;
         private BigDecimal discountPrice;
-        private String unit;
-        private String brand;
         private FoodType foodType;
-        private Boolean featured;
-        private Boolean inStock;
+        private String servingSize;
         private Integer preparationMinutes;
+        /** Bestseller / recommended. */
+        private Boolean featured;
+        private Boolean available;
 
         private String categoryUuid;
         private String categoryName;
         private String subCategoryUuid;
         private String subCategoryName;
 
-        // Filled for cross-store search results
-        private String shopUuid;
-        private String shopName;
+        // Filled for cross-restaurant search results
+        private String restaurantUuid;
+        private String restaurantName;
         private Double distanceKm;
     }
 
@@ -232,7 +230,7 @@ public class CustomerMarketplaceDTO {
         private String imageUrl;
         private Long itemCount;
         /** Filled only by the full-menu endpoint. */
-        private List<ItemCard> items;
+        private List<DishCard> items;
     }
 
     @Getter
@@ -245,26 +243,26 @@ public class CustomerMarketplaceDTO {
         private String globalCategoryUuid;
         private Long itemCount;
         private List<MenuSubCategory> subCategories = new ArrayList<>();
-        /** Filled only by the full-menu endpoint (items with no subcategory). */
-        private List<ItemCard> items;
+        /** Filled only by the full-menu endpoint (dishes with no subcategory). */
+        private List<DishCard> items;
     }
 
-    /** Store page: header + category tree (left side bar / tabs). */
+    /** Restaurant page: header + menu sections (optionally with dishes). */
     @Getter
     @Setter
-    public static class ShopDetailResponse {
-        private ShopCard shop;
+    public static class RestaurantDetailResponse {
+        private RestaurantCard restaurant;
         private List<MenuCategory> categories;
     }
 
     @Getter
     @Setter
     public static class SearchResponse {
-        /** Global categories whose name matches (tap -> nearby list filtered by it). */
-        private List<GlobalCategoryCard> categories;
-        /** Nearby stores whose name or global category matches. */
-        private List<ShopCard> shops;
-        /** Matching items from nearby stores, nearest store first. */
-        private DataTableResponsePacket<ItemCard> items;
+        /** Cuisines whose name matches (tap -> nearby list filtered by it). */
+        private List<CuisineCard> cuisines;
+        /** Nearby restaurants whose name or cuisine matches. */
+        private List<RestaurantCard> restaurants;
+        /** Matching dishes from nearby restaurants, nearest restaurant first. */
+        private DataTableResponsePacket<DishCard> dishes;
     }
 }

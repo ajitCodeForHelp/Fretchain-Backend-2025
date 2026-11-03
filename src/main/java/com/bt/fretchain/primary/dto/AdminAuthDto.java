@@ -22,6 +22,9 @@ public class AdminAuthDto {
         private String fullName;
         private String secretKey;
         private UserTypeEnum userType;
+        private String email;
+        /** Shop / restaurant logins only: store, role and allowed activities. */
+        private Object store;
     }
 
 }

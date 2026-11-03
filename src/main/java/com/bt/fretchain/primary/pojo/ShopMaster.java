@@ -1,7 +1,5 @@
 package com.bt.fretchain.primary.pojo;
 
-import com.bt.fretchain.primary.pojo.enums.BusinessType;
-import com.bt.fretchain.primary.pojo.enums.FoodType;
 import com.bt.fretchain.primary.pojo.enums.ShopStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -14,7 +12,8 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * A store in the marketplace: either a SHOP or a RESTAURANT ({@link #businessType}).
+ * A shop (grocery, pharmacy, electronics...). Restaurants live in their own
+ * module (RestaurantMaster and friends).
  *
  * Hierarchy:
  *   ShopGlobalCategory (platform, many-to-many)  <-- ShopMaster
@@ -30,23 +29,13 @@ import java.util.Set;
         @Index(name = "idx_shop_mobile", columnList = "mobile"),
         @Index(name = "idx_shop_status", columnList = "status"),
         // Used by the nearby query (bounding-box pre-filter before Haversine)
-        @Index(name = "idx_shop_type_geo", columnList = "business_type, latitude, longitude")
+        @Index(name = "idx_shop_geo", columnList = "latitude, longitude")
     }
 )
 public class ShopMaster extends BaseEntity {
 
     @Column(name = "shop_code", unique = true, length = 50)
     private String shopCode;
-
-    /** SHOP or RESTAURANT. Existing rows default to SHOP. */
-    @Enumerated(EnumType.STRING)
-    @Column(
-        name = "business_type",
-        nullable = false,
-        length = 20,
-        columnDefinition = "VARCHAR(20) NOT NULL DEFAULT 'SHOP'"
-    )
-    private BusinessType businessType = BusinessType.SHOP;
 
     @Column(name = "name_en", nullable = false, length = 150)
     private String nameEn;
@@ -136,16 +125,6 @@ public class ShopMaster extends BaseEntity {
     @Column(name = "commission_percentage", precision = 5, scale = 2)
     private BigDecimal commissionPercentage = BigDecimal.ZERO;
 
-    // ---------------- Restaurant specific (nullable for shops) ----------------
-
-    /** VEG = pure veg restaurant, BOTH = veg + non-veg. */
-    @Enumerated(EnumType.STRING)
-    @Column(name = "food_type", length = 20)
-    private FoodType foodType;
-
-    @Column(name = "cost_for_two", precision = 12, scale = 2)
-    private BigDecimal costForTwo;
-
     // ---------------- Ratings (denormalised, updated by review module) ----------------
 
     @Column(precision = 3, scale = 2)
@@ -159,6 +138,17 @@ public class ShopMaster extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ShopStatus status = ShopStatus.PENDING;
+
+    /** Reason given by the admin when rejecting / suspending. Cleared on approval. */
+    @Column(name = "status_reason", length = 500)
+    private String statusReason;
+
+    @Column(name = "status_changed_at")
+    private java.time.LocalDateTime statusChangedAt;
+
+    /** True when created through the public registration page. */
+    @Column(name = "self_registered")
+    private Boolean selfRegistered = false;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id")
