@@ -45,6 +45,16 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ResponseData> handleUnauthorized(UnauthorizedException e) {
+        return ResponseEntity.ok(
+                ResponseData.builder()
+                        .statusCode(401)
+                        .message(e.getMessage())
+                        .build()
+        );
+    }
+
     @ExceptionHandler(ForbiddenException.class)
     public ResponseEntity<ResponseData> handleForbidden(ForbiddenException e) {
         return ResponseEntity.ok(
