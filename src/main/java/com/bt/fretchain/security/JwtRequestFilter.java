@@ -7,7 +7,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
@@ -20,6 +19,17 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Reads the Bearer JWT and puts a {@link JwtAuthenticationToken} in the security context.
+ *
+ * - Protected paths: a valid token is required, otherwise 401.
+ * - Public paths: the token is optional; when a valid one is sent the user is still
+ *   identified, so JwtUserDetailsService.findLoggedInUser() works there too.
+ *
+ * A token is valid when its signature and expiry are correct (checked while parsing)
+ * and its owner ("u-id") still exists. The owner's name is NOT compared any more, so
+ * renaming a user no longer invalidates their login.
+ */
 @Component
 public class JwtRequestFilter extends OncePerRequestFilter {
 
@@ -29,76 +39,88 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     private JwtTokenUtil jwtTokenUtil;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
-        if (request.getMethod().equals("OPTIONS") || canSkipAuthentication(request)) {
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
+
+        if (request.getMethod().equals("OPTIONS") || isIgnored(request)) {
             filterChain.doFilter(request, response);
             return;
         }
-        final String requestTokenHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
+        boolean publicPath = isPublic(request);
 
-        String userId = null;
-        String userType = null;
-        String deviceId = null;
-        String userToken = null;
-        String username = null;
+        boolean authenticated = authenticate(request.getHeader(HttpHeaders.AUTHORIZATION));
 
-        String jwtToken = null;
-        if (requestTokenHeader != null) {
-            if (requestTokenHeader.startsWith("Bearer ")) {
-                jwtToken = requestTokenHeader.substring(7);
-            } else {
-                jwtToken = requestTokenHeader;
-            }
-            try {
-                username = jwtTokenUtil.getUsernameFromToken(jwtToken);
-                userId = (String) jwtTokenUtil.getValueFromClaimsKey(jwtToken, "u-id");
-                userType = (String) jwtTokenUtil.getValueFromClaimsKey(jwtToken, "u-ty");
-                deviceId = (String) jwtTokenUtil.getValueFromClaimsKey(jwtToken, "d-id");
-                userToken = (String) jwtTokenUtil.getValueFromClaimsKey(jwtToken, "token");
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-
-        if (userId == null) {
+        if (!authenticated && !publicPath) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized");
             return;
-        }
-
-
-        // TODO  >> Need to unComment It
-
-        if (SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails userDetails = this.jwtUserDetailsService.loadUserByUsername(userId, userType, userToken);
-            // UserAdmin userAdmin = this.jwtUserDetailsService.findUserAdmin(username);
-            if (Boolean.TRUE.equals(jwtTokenUtil.validateToken(jwtToken, userDetails))) {
-                JwtAuthenticationToken jwtAuthenticationToken = new JwtAuthenticationToken(
-                        Jwt.withTokenValue(jwtToken)
-                                .claim("username", username)
-                                .claim("u-id", userId)
-                                .claim("u-ty", userType)
-                                .claim("d-id", deviceId)
-                                .claim("token", userToken)
-                                .header(HttpHeaders.AUTHORIZATION, requestTokenHeader)
-                                .build()
-                );
-                jwtAuthenticationToken.setAuthenticated(true);
-                SecurityContextHolder.getContext().setAuthentication(jwtAuthenticationToken);
-            }
         }
         filterChain.doFilter(request, response);
     }
 
-    private boolean canSkipAuthentication(HttpServletRequest request) {
-        // if (true) return true;
+    /** @return true when the header carries a valid token and the context now holds it. */
+    private boolean authenticate(String header) {
+        if (header == null || header.isBlank()) {
+            return false;
+        }
+        String jwtToken = header.startsWith("Bearer ") ? header.substring(7).trim() : header.trim();
+        if (jwtToken.isEmpty() || "null".equals(jwtToken) || "undefined".equals(jwtToken)) {
+            return false;
+        }
+
+        String username;
+        String userId;
+        String userType;
+        String deviceId;
+        String userToken;
+        try {
+            // parsing verifies the signature and the expiry
+            username = jwtTokenUtil.getUsernameFromToken(jwtToken);
+            userId = (String) jwtTokenUtil.getValueFromClaimsKey(jwtToken, "u-id");
+            userType = (String) jwtTokenUtil.getValueFromClaimsKey(jwtToken, "u-ty");
+            deviceId = (String) jwtTokenUtil.getValueFromClaimsKey(jwtToken, "d-id");
+            userToken = (String) jwtTokenUtil.getValueFromClaimsKey(jwtToken, "token");
+        } catch (Exception e) {
+            logger.debug("Invalid JWT: " + e.getMessage());
+            return false;
+        }
+
+        if (!jwtUserDetailsService.tokenOwnerExists(userId, userType)) {
+            return false;
+        }
+
+        if (!(SecurityContextHolder.getContext().getAuthentication() instanceof JwtAuthenticationToken)) {
+            Jwt.Builder jwt = Jwt.withTokenValue(jwtToken)
+                    .claim("u-id", userId)
+                    .header(HttpHeaders.AUTHORIZATION, header);
+            // Jwt does not accept null claim values
+            if (username != null) jwt.claim("username", username);
+            if (userType != null) jwt.claim("u-ty", userType);
+            if (deviceId != null) jwt.claim("d-id", deviceId);
+            if (userToken != null) jwt.claim("token", userToken);
+
+            JwtAuthenticationToken authentication = new JwtAuthenticationToken(jwt.build());
+            authentication.setAuthenticated(true);
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+        }
+        return true;
+    }
+
+    private static final RequestMatcher IGNORED = matcher(Constants.IGNORE_PATTERNS);
+    private static final RequestMatcher PUBLIC = matcher(Constants.PERMIT_ALL_PATTERNS);
+
+    private boolean isIgnored(HttpServletRequest request) {
+        return IGNORED.matches(request);
+    }
+
+    private boolean isPublic(HttpServletRequest request) {
+        return PUBLIC.matches(request);
+    }
+
+    private static RequestMatcher matcher(String[] patterns) {
         List<RequestMatcher> matchers = new ArrayList<>();
-        for (String pattern : Constants.IGNORE_PATTERNS) {
+        for (String pattern : patterns) {
             matchers.add(new AntPathRequestMatcher(pattern));
         }
-        for (String pattern : Constants.PERMIT_ALL_PATTERNS) {
-            matchers.add(new AntPathRequestMatcher(pattern));
-        }
-        RequestMatcher ignoreRequestMatcher = new OrRequestMatcher(matchers);
-        return ignoreRequestMatcher.matches(request);
+        return new OrRequestMatcher(matchers);
     }
 }

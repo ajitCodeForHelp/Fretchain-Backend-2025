@@ -31,8 +31,9 @@ public class Constants {
             "/actuator/**",
             "/customer/api/auth/**",
             "/customer/api/home/**",
-            "/admin/api/auth/**"
+            "/admin/api/auth/**",
+            "/driver/api/auth/**"
     };
     public static final String[] MONITORING_PATTERNS = new String[]{"/actuator1/**"};
-    public static final String[] PROTECTED_PATTERNS = new String[]{"/admin/**", "/partner/**", "/customer/**", "/ops/**"};
+    public static final String[] PROTECTED_PATTERNS = new String[]{"/admin/**", "/partner/**", "/customer/**", "/driver/**", "/ops/**"};
 }
