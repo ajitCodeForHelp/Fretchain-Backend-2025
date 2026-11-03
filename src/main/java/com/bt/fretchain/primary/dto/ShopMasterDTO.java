@@ -86,8 +86,20 @@ public class ShopMasterDTO {
         /** Only used on create (defaults to PENDING). Later changes go through the approval action. */
         private ShopStatus status;
 
-        // UUID of the shop owner, if assigned
-        private String ownerUuid;
+        // ---- Owner login (required on create; later changes via /{uuid}/owner)
+        /** Owner's name. Saved in system_user as a SHOP_USER with the Owner role. */
+        @Size(max = 150)
+        private String ownerName;
+
+        @Email
+        @Size(max = 128)
+        private String ownerEmail;
+
+        @Size(max = 15)
+        private String ownerMobile;
+
+        @Size(min = 6, max = 60)
+        private String ownerPassword;
     }
 
     @Getter

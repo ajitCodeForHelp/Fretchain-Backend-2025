@@ -105,10 +105,14 @@ public class ShopPartnerService {
     public List<ShopPartnerDTO.ActivityOption> activityCatalog() {
         List<ShopPartnerDTO.ActivityOption> list = new ArrayList<>();
         for (ShopActivity a : ShopActivity.values()) {
+            if (a.isLegacy()) {
+                continue;
+            }
             ShopPartnerDTO.ActivityOption o = new ShopPartnerDTO.ActivityOption();
             o.setCode(a);
             o.setGroup(a.getGroup());
             o.setWrite(a.isWrite());
+            o.setAction(a.getAction().name());
             list.add(o);
         }
         return list;
@@ -148,7 +152,7 @@ public class ShopPartnerService {
 
     @Transactional
     public ShopPartnerDTO.RoleDetail saveRole(SystemUser user, ShopPartnerDTO.RoleSaveOrUpdate req) {
-        ShopStaff staff = access.require(user, ShopActivity.ROLE_MANAGE);
+        ShopStaff staff = access.require(user, ShopActivity.ROLE_ADD);
         Long shopId = staff.getShop().getRecordId();
 
         if (roleRepository.existsByShop_RecordIdAndNameIgnoreCaseAndDeletedFalse(shopId, req.getName().trim())) {
@@ -165,7 +169,7 @@ public class ShopPartnerService {
 
     @Transactional
     public ShopPartnerDTO.RoleDetail updateRole(SystemUser user, String uuid, ShopPartnerDTO.RoleSaveOrUpdate req) {
-        ShopStaff staff = access.require(user, ShopActivity.ROLE_MANAGE);
+        ShopStaff staff = access.require(user, ShopActivity.ROLE_EDIT);
         ShopRole role = findRole(uuid, staff);
         if (role.isOwnerRole()) {
             throw new ForbiddenException("role.owner.locked");
@@ -181,7 +185,7 @@ public class ShopPartnerService {
 
     @Transactional
     public void updateRoleStatus(SystemUser user, String uuid, boolean active) {
-        ShopStaff staff = access.require(user, ShopActivity.ROLE_MANAGE);
+        ShopStaff staff = access.require(user, ShopActivity.ROLE_STATUS);
         ShopRole role = findRole(uuid, staff);
         if (role.isOwnerRole()) {
             throw new ForbiddenException("role.owner.locked");
@@ -216,7 +220,7 @@ public class ShopPartnerService {
         d.setDescription(role.getDescription());
         d.setOwnerRole(role.isOwnerRole());
         d.setActivities(role.isOwnerRole()
-                ? List.of(ShopActivity.values())
+                ? java.util.Arrays.stream(ShopActivity.values()).filter(a -> !a.isLegacy()).toList()
                 : role.getActivities().stream().sorted().toList());
         d.setActive(role.isActive());
         return d;
@@ -268,7 +272,7 @@ public class ShopPartnerService {
 
     @Transactional
     public ShopPartnerDTO.StaffDetail saveStaff(SystemUser user, ShopPartnerDTO.StaffSaveOrUpdate req) {
-        ShopStaff me = access.require(user, ShopActivity.STAFF_MANAGE);
+        ShopStaff me = access.require(user, ShopActivity.STAFF_ADD);
         ShopRole role = assignableRole(req.getRoleUuid(), me);
 
         SystemUser login = loginHelper.create(req.getFullName(), req.getEmail(), req.getMobile(),
@@ -285,7 +289,7 @@ public class ShopPartnerService {
 
     @Transactional
     public ShopPartnerDTO.StaffDetail updateStaff(SystemUser user, String uuid, ShopPartnerDTO.StaffSaveOrUpdate req) {
-        ShopStaff me = access.require(user, ShopActivity.STAFF_MANAGE);
+        ShopStaff me = access.require(user, ShopActivity.STAFF_EDIT);
         ShopStaff staff = findStaff(uuid, me);
 
         if (staff.isOwner()) {
@@ -305,7 +309,7 @@ public class ShopPartnerService {
 
     @Transactional
     public void updateStaffStatus(SystemUser user, String uuid, boolean active) {
-        ShopStaff me = access.require(user, ShopActivity.STAFF_MANAGE);
+        ShopStaff me = access.require(user, ShopActivity.STAFF_STATUS);
         ShopStaff staff = findStaff(uuid, me);
         if (staff.isOwner()) {
             throw new ForbiddenException("staff.owner.locked");

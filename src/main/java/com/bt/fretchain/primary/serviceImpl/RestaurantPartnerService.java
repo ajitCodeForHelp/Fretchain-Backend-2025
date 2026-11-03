@@ -107,10 +107,14 @@ public class RestaurantPartnerService {
     public List<RestaurantPartnerDTO.ActivityOption> activityCatalog() {
         List<RestaurantPartnerDTO.ActivityOption> list = new ArrayList<>();
         for (RestaurantActivity a : RestaurantActivity.values()) {
+            if (a.isLegacy()) {
+                continue;
+            }
             RestaurantPartnerDTO.ActivityOption o = new RestaurantPartnerDTO.ActivityOption();
             o.setCode(a);
             o.setGroup(a.getGroup());
             o.setWrite(a.isWrite());
+            o.setAction(a.getAction().name());
             list.add(o);
         }
         return list;
@@ -150,7 +154,7 @@ public class RestaurantPartnerService {
 
     @Transactional
     public RestaurantPartnerDTO.RoleDetail saveRole(SystemUser user, RestaurantPartnerDTO.RoleSaveOrUpdate req) {
-        RestaurantStaff staff = access.require(user, RestaurantActivity.ROLE_MANAGE);
+        RestaurantStaff staff = access.require(user, RestaurantActivity.ROLE_ADD);
         Long restaurantId = staff.getRestaurant().getRecordId();
 
         if (roleRepository.existsByRestaurant_RecordIdAndNameIgnoreCaseAndDeletedFalse(restaurantId, req.getName().trim())) {
@@ -167,7 +171,7 @@ public class RestaurantPartnerService {
 
     @Transactional
     public RestaurantPartnerDTO.RoleDetail updateRole(SystemUser user, String uuid, RestaurantPartnerDTO.RoleSaveOrUpdate req) {
-        RestaurantStaff staff = access.require(user, RestaurantActivity.ROLE_MANAGE);
+        RestaurantStaff staff = access.require(user, RestaurantActivity.ROLE_EDIT);
         RestaurantRole role = findRole(uuid, staff);
         if (role.isOwnerRole()) {
             throw new ForbiddenException("role.owner.locked");
@@ -183,7 +187,7 @@ public class RestaurantPartnerService {
 
     @Transactional
     public void updateRoleStatus(SystemUser user, String uuid, boolean active) {
-        RestaurantStaff staff = access.require(user, RestaurantActivity.ROLE_MANAGE);
+        RestaurantStaff staff = access.require(user, RestaurantActivity.ROLE_STATUS);
         RestaurantRole role = findRole(uuid, staff);
         if (role.isOwnerRole()) {
             throw new ForbiddenException("role.owner.locked");
@@ -218,7 +222,7 @@ public class RestaurantPartnerService {
         d.setDescription(role.getDescription());
         d.setOwnerRole(role.isOwnerRole());
         d.setActivities(role.isOwnerRole()
-                ? List.of(RestaurantActivity.values())
+                ? java.util.Arrays.stream(RestaurantActivity.values()).filter(a -> !a.isLegacy()).toList()
                 : role.getActivities().stream().sorted().toList());
         d.setActive(role.isActive());
         return d;
@@ -270,7 +274,7 @@ public class RestaurantPartnerService {
 
     @Transactional
     public RestaurantPartnerDTO.StaffDetail saveStaff(SystemUser user, RestaurantPartnerDTO.StaffSaveOrUpdate req) {
-        RestaurantStaff me = access.require(user, RestaurantActivity.STAFF_MANAGE);
+        RestaurantStaff me = access.require(user, RestaurantActivity.STAFF_ADD);
         RestaurantRole role = assignableRole(req.getRoleUuid(), me);
 
         SystemUser login = loginHelper.create(req.getFullName(), req.getEmail(), req.getMobile(),
@@ -287,7 +291,7 @@ public class RestaurantPartnerService {
 
     @Transactional
     public RestaurantPartnerDTO.StaffDetail updateStaff(SystemUser user, String uuid, RestaurantPartnerDTO.StaffSaveOrUpdate req) {
-        RestaurantStaff me = access.require(user, RestaurantActivity.STAFF_MANAGE);
+        RestaurantStaff me = access.require(user, RestaurantActivity.STAFF_EDIT);
         RestaurantStaff staff = findStaff(uuid, me);
 
         if (staff.isOwner()) {
@@ -307,7 +311,7 @@ public class RestaurantPartnerService {
 
     @Transactional
     public void updateStaffStatus(SystemUser user, String uuid, boolean active) {
-        RestaurantStaff me = access.require(user, RestaurantActivity.STAFF_MANAGE);
+        RestaurantStaff me = access.require(user, RestaurantActivity.STAFF_STATUS);
         RestaurantStaff staff = findStaff(uuid, me);
         if (staff.isOwner()) {
             throw new ForbiddenException("staff.owner.locked");

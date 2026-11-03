@@ -127,6 +127,8 @@ public class ShopPartnerDTO {
         private ShopActivity code;
         private String group;
         private boolean write;
+        /** VIEW / ADD / EDIT / STATUS */
+        private String action;
     }
 
     // ---------------------------------------------------------------- staff

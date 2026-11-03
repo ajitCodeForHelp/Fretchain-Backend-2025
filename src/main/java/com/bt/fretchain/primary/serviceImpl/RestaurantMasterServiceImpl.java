@@ -6,6 +6,7 @@ import com.bt.fretchain.exception.BadRequestException;
 import com.bt.fretchain.exception.DuplicateResourceException;
 import com.bt.fretchain.exception.ResourceNotFoundException;
 import com.bt.fretchain.primary.dto.RestaurantMasterDTO;
+import com.bt.fretchain.primary.dto.RestaurantPartnerDTO;
 import com.bt.fretchain.primary.mapper.RestaurantMasterMapper;
 import com.bt.fretchain.primary.pojo.RestaurantCategory;
 import com.bt.fretchain.primary.pojo.RestaurantGlobalCategory;
@@ -44,6 +45,7 @@ public class RestaurantMasterServiceImpl implements RestaurantMasterService {
     private final SystemUserRepository userRepository;
     private final RestaurantGlobalCategoryRepository globalCategoryRepository;
     private final RestaurantCategoryRepository restaurantCategoryRepository;
+    private final RestaurantPartnerService partnerService;
 
     @Override
     @Transactional
@@ -52,6 +54,7 @@ public class RestaurantMasterServiceImpl implements RestaurantMasterService {
             SystemUser user) {
 
         validateRestaurantCode(request.getRestaurantCode(), null);
+        validateOwner(request);
         validateTimings(request);
 
         RestaurantMaster entity = mapper.toEntity(request);
@@ -60,18 +63,20 @@ public class RestaurantMasterServiceImpl implements RestaurantMasterService {
         entity.setGlobalCategories(resolveGlobalCategories(
                 request.getGlobalCategoryUuids()));
 
-        if (request.getOwnerUuid() != null
-                && !request.getOwnerUuid().isBlank()) {
-            entity.setOwner(userRepository.findByUuidAndDeletedFalse(
-                    request.getOwnerUuid()
-            ).orElseThrow(() ->
-                    new ResourceNotFoundException("user.notfound")));
-        }
 
         entity.setCreatedBy(user.getRecordId());
         entity.setModifiedBy(user.getRecordId());
+        entity = repository.save(entity);
 
-        return mapper.toDetailDto(repository.save(entity));
+        // Owner login: system_user (RESTAURANT_USER) + Owner role, linked as restaurant.owner
+        RestaurantPartnerDTO.OwnerSave owner = new RestaurantPartnerDTO.OwnerSave();
+        owner.setFullName(request.getOwnerName());
+        owner.setEmail(request.getOwnerEmail());
+        owner.setMobile(request.getOwnerMobile());
+        owner.setPassword(request.getOwnerPassword());
+        partnerService.saveOwner(entity.getUuid(), owner, user);
+
+        return mapper.toDetailDto(entity);
     }
 
     @Override
@@ -102,13 +107,6 @@ public class RestaurantMasterServiceImpl implements RestaurantMasterService {
 
         unlinkRemovedGlobalCategories(entity, globalCategories, user);
 
-        if (request.getOwnerUuid() != null
-                && !request.getOwnerUuid().isBlank()) {
-            entity.setOwner(userRepository.findByUuidAndDeletedFalse(
-                    request.getOwnerUuid()
-            ).orElseThrow(() ->
-                    new ResourceNotFoundException("user.notfound")));
-        }
 
         entity.setModifiedBy(user.getRecordId());
 
@@ -216,6 +214,21 @@ public class RestaurantMasterServiceImpl implements RestaurantMasterService {
         if (entity.getCommissionPercentage() == null) {
             entity.setCommissionPercentage(BigDecimal.ZERO);
         }
+    }
+
+    /** The owner login is created together with the restaurant; checked before anything is saved. */
+    private void validateOwner(RestaurantMasterDTO.SaveOrUpdate request) {
+        if (isBlank(request.getOwnerName()) || isBlank(request.getOwnerEmail())
+                || isBlank(request.getOwnerPassword())) {
+            throw new BadRequestException("owner.required");
+        }
+        if (userRepository.existsByEmailIgnoreCase(request.getOwnerEmail().trim())) {
+            throw new DuplicateResourceException("user.email.exists");
+        }
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private void validateTimings(RestaurantMasterDTO.SaveOrUpdate request) {

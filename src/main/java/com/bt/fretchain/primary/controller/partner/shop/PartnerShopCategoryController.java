@@ -28,7 +28,7 @@ public class PartnerShopCategoryController extends _BaseController {
     @Transactional
     public ResponseEntity<ResponseData> save(@RequestBody ShopCategoryDTO.SaveOrUpdate request) {
         SystemUser user = getLoggedInUser();
-        ShopStaff staff = access.require(user, ShopActivity.CATEGORY_MANAGE);
+        ShopStaff staff = access.require(user, ShopActivity.CATEGORY_ADD);
         request.setShopUuid(staff.getShop().getUuid());
         return ok(service.save(validator.validate(request), user), "record.saved");
     }
@@ -38,7 +38,7 @@ public class PartnerShopCategoryController extends _BaseController {
     public ResponseEntity<ResponseData> update(@PathVariable String uuid,
                                                @RequestBody ShopCategoryDTO.SaveOrUpdate request) {
         SystemUser user = getLoggedInUser();
-        ShopStaff staff = access.require(user, ShopActivity.CATEGORY_MANAGE);
+        ShopStaff staff = access.require(user, ShopActivity.CATEGORY_EDIT);
         access.ensureSameShop(service.getById(uuid).getShopUuid(), staff);
         request.setShopUuid(staff.getShop().getUuid());
         return ok(service.update(uuid, validator.validate(request), user), "record.updated");
@@ -65,7 +65,7 @@ public class PartnerShopCategoryController extends _BaseController {
     @Transactional
     public ResponseEntity<ResponseData> updateStatus(@PathVariable String uuid, @RequestParam Boolean active) {
         SystemUser user = getLoggedInUser();
-        ShopStaff staff = access.require(user, ShopActivity.CATEGORY_MANAGE);
+        ShopStaff staff = access.require(user, ShopActivity.CATEGORY_STATUS);
         access.ensureSameShop(service.getById(uuid).getShopUuid(), staff);
         service.updateStatus(uuid, active, user);
         return ok(null, "status.updated");

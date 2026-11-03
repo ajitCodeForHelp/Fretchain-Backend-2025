@@ -134,6 +134,8 @@ public class RestaurantPartnerDTO {
         private RestaurantActivity code;
         private String group;
         private boolean write;
+        /** VIEW / ADD / EDIT / STATUS */
+        private String action;
     }
 
     // ---------------------------------------------------------------- staff

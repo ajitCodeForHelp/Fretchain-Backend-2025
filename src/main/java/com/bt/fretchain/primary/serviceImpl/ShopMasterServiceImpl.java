@@ -6,6 +6,7 @@ import com.bt.fretchain.exception.BadRequestException;
 import com.bt.fretchain.exception.DuplicateResourceException;
 import com.bt.fretchain.exception.ResourceNotFoundException;
 import com.bt.fretchain.primary.dto.ShopMasterDTO;
+import com.bt.fretchain.primary.dto.ShopPartnerDTO;
 import com.bt.fretchain.primary.mapper.ShopMasterMapper;
 import com.bt.fretchain.primary.pojo.ShopCategory;
 import com.bt.fretchain.primary.pojo.ShopGlobalCategory;
@@ -44,6 +45,7 @@ public class ShopMasterServiceImpl implements ShopMasterService {
     private final SystemUserRepository userRepository;
     private final ShopGlobalCategoryRepository globalCategoryRepository;
     private final ShopCategoryRepository shopCategoryRepository;
+    private final ShopPartnerService partnerService;
 
     @Override
     @Transactional
@@ -52,6 +54,7 @@ public class ShopMasterServiceImpl implements ShopMasterService {
             SystemUser user) {
 
         validateShopCode(request.getShopCode(), null);
+        validateOwner(request);
         validateTimings(request);
 
         ShopMaster entity = mapper.toEntity(request);
@@ -60,18 +63,20 @@ public class ShopMasterServiceImpl implements ShopMasterService {
         entity.setGlobalCategories(resolveGlobalCategories(
                 request.getGlobalCategoryUuids()));
 
-        if (request.getOwnerUuid() != null
-                && !request.getOwnerUuid().isBlank()) {
-            entity.setOwner(userRepository.findByUuidAndDeletedFalse(
-                    request.getOwnerUuid()
-            ).orElseThrow(() ->
-                    new ResourceNotFoundException("user.notfound")));
-        }
 
         entity.setCreatedBy(user.getRecordId());
         entity.setModifiedBy(user.getRecordId());
+        entity = repository.save(entity);
 
-        return mapper.toDetailDto(repository.save(entity));
+        // Owner login: system_user (SHOP_USER) + Owner role, linked as shop.owner
+        ShopPartnerDTO.OwnerSave owner = new ShopPartnerDTO.OwnerSave();
+        owner.setFullName(request.getOwnerName());
+        owner.setEmail(request.getOwnerEmail());
+        owner.setMobile(request.getOwnerMobile());
+        owner.setPassword(request.getOwnerPassword());
+        partnerService.saveOwner(entity.getUuid(), owner, user);
+
+        return mapper.toDetailDto(entity);
     }
 
     @Override
@@ -102,13 +107,6 @@ public class ShopMasterServiceImpl implements ShopMasterService {
 
         unlinkRemovedGlobalCategories(entity, globalCategories, user);
 
-        if (request.getOwnerUuid() != null
-                && !request.getOwnerUuid().isBlank()) {
-            entity.setOwner(userRepository.findByUuidAndDeletedFalse(
-                    request.getOwnerUuid()
-            ).orElseThrow(() ->
-                    new ResourceNotFoundException("user.notfound")));
-        }
 
         entity.setModifiedBy(user.getRecordId());
 
@@ -216,6 +214,21 @@ public class ShopMasterServiceImpl implements ShopMasterService {
         if (entity.getCommissionPercentage() == null) {
             entity.setCommissionPercentage(BigDecimal.ZERO);
         }
+    }
+
+    /** The owner login is created together with the shop; checked before anything is saved. */
+    private void validateOwner(ShopMasterDTO.SaveOrUpdate request) {
+        if (isBlank(request.getOwnerName()) || isBlank(request.getOwnerEmail())
+                || isBlank(request.getOwnerPassword())) {
+            throw new BadRequestException("owner.required");
+        }
+        if (userRepository.existsByEmailIgnoreCase(request.getOwnerEmail().trim())) {
+            throw new DuplicateResourceException("user.email.exists");
+        }
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private void validateTimings(ShopMasterDTO.SaveOrUpdate request) {

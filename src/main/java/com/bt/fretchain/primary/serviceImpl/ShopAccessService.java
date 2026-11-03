@@ -62,9 +62,11 @@ public class ShopAccessService {
         if (granted.contains(activity)) {
             return true;
         }
-        // MANAGE / EDIT implies VIEW of the same group
-        return !activity.isWrite() && granted.stream()
-                .anyMatch(a -> a.isWrite() && a.getGroup().equals(activity.getGroup()));
+        return granted.stream().anyMatch(a -> a.getGroup().equals(activity.getGroup())
+                // any write action implies VIEW of the same menu
+                && ((!activity.isWrite() && a.isWrite())
+                // legacy MANAGE implies ADD / EDIT / STATUS
+                || (activity.isWrite() && a.isLegacy())));
     }
 
     /** Current staff, checked for the activity. Write actions are blocked for suspended shops. */
@@ -101,7 +103,7 @@ public class ShopAccessService {
         // Expose VIEW activities implied by MANAGE so the UI can rely on the list alone
         List<ShopActivity> list = new ArrayList<>();
         for (ShopActivity a : ShopActivity.values()) {
-            if (has(staff, a)) {
+            if (!a.isLegacy() && has(staff, a)) {
                 list.add(a);
             }
         }

@@ -28,7 +28,7 @@ public class PartnerRestaurantCategoryController extends _BaseController {
     @Transactional
     public ResponseEntity<ResponseData> save(@RequestBody RestaurantCategoryDTO.SaveOrUpdate request) {
         SystemUser user = getLoggedInUser();
-        RestaurantStaff staff = access.require(user, RestaurantActivity.CATEGORY_MANAGE);
+        RestaurantStaff staff = access.require(user, RestaurantActivity.CATEGORY_ADD);
         request.setRestaurantUuid(staff.getRestaurant().getUuid());
         return ok(service.save(validator.validate(request), user), "record.saved");
     }
@@ -38,7 +38,7 @@ public class PartnerRestaurantCategoryController extends _BaseController {
     public ResponseEntity<ResponseData> update(@PathVariable String uuid,
                                                @RequestBody RestaurantCategoryDTO.SaveOrUpdate request) {
         SystemUser user = getLoggedInUser();
-        RestaurantStaff staff = access.require(user, RestaurantActivity.CATEGORY_MANAGE);
+        RestaurantStaff staff = access.require(user, RestaurantActivity.CATEGORY_EDIT);
         access.ensureSameRestaurant(service.getById(uuid).getRestaurantUuid(), staff);
         request.setRestaurantUuid(staff.getRestaurant().getUuid());
         return ok(service.update(uuid, validator.validate(request), user), "record.updated");
@@ -65,7 +65,7 @@ public class PartnerRestaurantCategoryController extends _BaseController {
     @Transactional
     public ResponseEntity<ResponseData> updateStatus(@PathVariable String uuid, @RequestParam Boolean active) {
         SystemUser user = getLoggedInUser();
-        RestaurantStaff staff = access.require(user, RestaurantActivity.CATEGORY_MANAGE);
+        RestaurantStaff staff = access.require(user, RestaurantActivity.CATEGORY_STATUS);
         access.ensureSameRestaurant(service.getById(uuid).getRestaurantUuid(), staff);
         service.updateStatus(uuid, active, user);
         return ok(null, "status.updated");
