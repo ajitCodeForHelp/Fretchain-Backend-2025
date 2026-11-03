@@ -4,7 +4,9 @@ import com.bt.fretchain.bean.*;
 import com.bt.fretchain.primary.controller._BaseController;
 import com.bt.fretchain.primary.dto.RestaurantMasterDTO;
 import com.bt.fretchain.primary.pojo.SystemUser;
+import com.bt.fretchain.primary.dto.RestaurantPartnerDTO;
 import com.bt.fretchain.primary.service.RestaurantMasterService;
+import com.bt.fretchain.primary.serviceImpl.RestaurantPartnerService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +20,7 @@ import java.util.List;
 public class RestaurantMasterController extends _BaseController {
 
     private final RestaurantMasterService restaurantService;
+    private final RestaurantPartnerService partnerService;
 
     @PostMapping("/save")
     public ResponseEntity<ResponseData> save(
@@ -95,6 +98,28 @@ public class RestaurantMasterController extends _BaseController {
                 .statusCode(200)
                 .message("record.dropdown.fetched")
                 .data(data)
+                .build());
+    }
+    /** Owner login of the restaurant (null when not created yet). */
+    @GetMapping("/{uuid}/owner")
+    public ResponseEntity<ResponseData> getOwner(@PathVariable String uuid) {
+        return ResponseEntity.ok(ResponseData.builder()
+                .statusCode(200)
+                .message("record.fetched")
+                .data(partnerService.getOwner(uuid))
+                .build());
+    }
+
+    /** Create the owner login, or update its details / reset its password. */
+    @PutMapping("/{uuid}/owner")
+    public ResponseEntity<ResponseData> saveOwner(
+            @PathVariable String uuid,
+            @Valid @RequestBody RestaurantPartnerDTO.OwnerSave request) {
+
+        return ResponseEntity.ok(ResponseData.builder()
+                .statusCode(200)
+                .message("record.saved")
+                .data(partnerService.saveOwner(uuid, request, getLoggedInUser()))
                 .build());
     }
 }

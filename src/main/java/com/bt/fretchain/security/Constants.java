@@ -34,5 +34,5 @@ public class Constants {
             "/admin/api/auth/**"
     };
     public static final String[] MONITORING_PATTERNS = new String[]{"/actuator1/**"};
-    public static final String[] PROTECTED_PATTERNS = new String[]{"/admin/**", "/customer/**"  ,"/ops/**"};
+    public static final String[] PROTECTED_PATTERNS = new String[]{"/admin/**", "/partner/**", "/customer/**", "/ops/**"};
 }

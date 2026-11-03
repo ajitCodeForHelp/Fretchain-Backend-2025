@@ -27,4 +27,10 @@ public interface SystemUserRepository extends JpaRepository<SystemUser, Long> {
             String uuid
     );
 
+
+    boolean existsByEmailIgnoreCase(String email);
+
+    boolean existsByEmailIgnoreCaseAndRecordIdNot(String email, Long recordId);
+
+    boolean existsByMobileAndRecordIdNot(String mobile, Long recordId);
 }
