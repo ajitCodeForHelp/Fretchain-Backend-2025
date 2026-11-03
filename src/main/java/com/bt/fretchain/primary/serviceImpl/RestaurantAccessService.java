@@ -1,5 +1,6 @@
 package com.bt.fretchain.primary.serviceImpl;
 
+import com.bt.fretchain.bean.KeyValueDto;
 import com.bt.fretchain.exception.ForbiddenException;
 import com.bt.fretchain.exception.ResourceNotFoundException;
 import com.bt.fretchain.primary.dto.RestaurantPartnerDTO;
@@ -104,6 +105,10 @@ public class RestaurantAccessService {
             }
         }
         session.setActivities(list);
+        session.setGlobalCategories(restaurant.getGlobalCategories().stream()
+                .filter(g -> g.isActive() && !g.isDeleted())
+                .map(g -> new KeyValueDto(g.getUuid(), g.getNameEn()))
+                .toList());
         return session;
     }
 }

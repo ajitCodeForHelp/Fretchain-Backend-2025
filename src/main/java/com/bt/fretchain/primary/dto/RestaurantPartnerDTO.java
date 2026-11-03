@@ -1,6 +1,7 @@
 package com.bt.fretchain.primary.dto;
 
 import com.bt.fretchain.primary.pojo.enums.FoodType;
+import com.bt.fretchain.bean.KeyValueDto;
 import com.bt.fretchain.primary.pojo.enums.RestaurantActivity;
 import com.bt.fretchain.primary.pojo.enums.RestaurantStatus;
 import jakarta.validation.constraints.*;
@@ -30,6 +31,8 @@ public class RestaurantPartnerDTO {
         private String roleName;
         private boolean owner;
         private List<RestaurantActivity> activities;
+        /** Global categories (cuisines for restaurants) assigned to the store. */
+        private List<KeyValueDto> globalCategories;
     }
 
     /** Fields a restaurant may edit itself. Status, commission, code and global categories stay admin-only. */

@@ -1,5 +1,6 @@
 package com.bt.fretchain.primary.dto;
 
+import com.bt.fretchain.bean.KeyValueDto;
 import com.bt.fretchain.primary.pojo.enums.ShopActivity;
 import com.bt.fretchain.primary.pojo.enums.ShopStatus;
 import jakarta.validation.constraints.*;
@@ -29,6 +30,8 @@ public class ShopPartnerDTO {
         private String roleName;
         private boolean owner;
         private List<ShopActivity> activities;
+        /** Global categories (cuisines for restaurants) assigned to the store. */
+        private List<KeyValueDto> globalCategories;
     }
 
     /** Fields a shop may edit itself. Status, commission, code and global categories stay admin-only. */
