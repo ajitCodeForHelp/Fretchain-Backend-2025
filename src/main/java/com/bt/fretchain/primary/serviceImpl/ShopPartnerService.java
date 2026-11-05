@@ -40,6 +40,7 @@ public class ShopPartnerService {
 
     private final ShopAccessService access;
     private final ShopMasterRepository shopRepository;
+    private final com.bt.fretchain.primary.repository.SystemUserRepository userRepository;
     private final ShopRoleRepository roleRepository;
     private final ShopStaffRepository staffRepository;
     private final ShopMasterMapper shopMapper;
@@ -358,13 +359,15 @@ public class ShopPartnerService {
     // Admin: owner login of a shop
     // =====================================================================
 
+    /** Name of the per-shop role with every activity, assignable to the shop's admin. */
+    public static final String ADMIN_ROLE_NAME = "Shop Admin";
+
     @Transactional(readOnly = true)
     public ShopPartnerDTO.StaffDetail getOwner(String shopUuid) {
         ShopMaster shop = shopRepository.findByUuidAndDeletedFalse(shopUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("shop.notfound"));
-        return staffRepository.findFirstByShop_RecordIdAndOwnerTrueAndDeletedFalse(shop.getRecordId())
-                .map(this::toStaffDetail)
-                .orElse(null);
+        SystemUser owner = shop.getOwner();
+        return owner == null || owner.isDeleted() ? null : ownerDetail(owner);
     }
 
     /** Creates the owner login (first time) or updates its details / password. */
@@ -373,49 +376,80 @@ public class ShopPartnerService {
         return saveOwner(shopUuid, req, admin.getRecordId());
     }
 
-    /** actorId = admin creating the owner, or null for public self-registration. */
+    /**
+     * actorId = admin creating the owner, or null for public self-registration.
+     * New owners are SHOP_OWNER logins linked through shop.owner (one owner can own many shops).
+     * Owners created before that (SHOP_USER + owner staff row) are still updated in place.
+     */
     @Transactional
     public ShopPartnerDTO.StaffDetail saveOwner(String shopUuid, ShopPartnerDTO.OwnerSave req, Long actorId) {
         ShopMaster shop = shopRepository.findByUuidAndDeletedFalse(shopUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("shop.notfound"));
 
-        ShopRole ownerRole = roleRepository.findFirstByShop_RecordIdAndOwnerRoleTrueAndDeletedFalse(shop.getRecordId())
-                .orElseGet(() -> {
-                    ShopRole r = new ShopRole();
-                    r.setShop(shop);
-                    r.setName(OWNER_ROLE_NAME);
-                    r.setDescription("Full access to the shop");
-                    r.setOwnerRole(true);
-                    r.getActivities().addAll(EnumSet.allOf(ShopActivity.class));
-                    r.setCreatedBy(actorId);
-                    r.setModifiedBy(actorId);
-                    return roleRepository.save(r);
-                });
-
-        ShopStaff owner = staffRepository.findFirstByShop_RecordIdAndOwnerTrueAndDeletedFalse(shop.getRecordId())
-                .orElse(null);
-
-        if (owner == null) {
-            SystemUser login = loginHelper.create(req.getFullName(), req.getEmail(), req.getMobile(),
-                    req.getPassword(), UserTypeEnum.SHOP_USER, actorId);
-            owner = new ShopStaff();
-            owner.setShop(shop);
-            owner.setUser(login);
-            owner.setRole(ownerRole);
-            owner.setOwner(true);
-            owner.setCreatedBy(actorId);
+        SystemUser owner = shop.getOwner();
+        if (owner == null || owner.isDeleted()) {
+            owner = loginHelper.create(req.getFullName(), req.getEmail(), req.getMobile(),
+                    req.getPassword(), UserTypeEnum.SHOP_OWNER, actorId);
         } else {
-            loginHelper.update(owner.getUser(), req.getFullName(), req.getEmail(), req.getMobile(),
+            loginHelper.update(owner, req.getFullName(), req.getEmail(), req.getMobile(),
                     req.getPassword(), actorId);
         }
-        owner.setModifiedBy(actorId);
-        owner = staffRepository.save(owner);
-
-        shop.setOwner(owner.getUser());
+        shop.setOwner(owner);
         shop.setModifiedBy(actorId);
         shopRepository.save(shop);
+        ensureAdminRole(shop, actorId);
+        return ownerDetail(owner);
+    }
 
-        return toStaffDetail(owner);
+    /** Admin: give an existing owner (who already owns other shops) this shop too. */
+    @Transactional
+    public ShopPartnerDTO.StaffDetail assignExistingOwner(String shopUuid, String ownerUuid, Long actorId) {
+        ShopMaster shop = shopRepository.findByUuidAndDeletedFalse(shopUuid)
+                .orElseThrow(() -> new ResourceNotFoundException("shop.notfound"));
+        SystemUser owner = userRepository.findByUuidAndDeletedFalse(ownerUuid)
+                .filter(u -> u.getUserType() == UserTypeEnum.SHOP_OWNER)
+                .orElseThrow(() -> new ResourceNotFoundException("owner.notfound"));
+        shop.setOwner(owner);
+        shop.setModifiedBy(actorId);
+        shopRepository.save(shop);
+        ensureAdminRole(shop, actorId);
+        return ownerDetail(owner);
+    }
+
+    /** Owners for the "existing owner" dropdown. */
+    @Transactional(readOnly = true)
+    public List<com.bt.fretchain.bean.KeyValueDto> ownerKeyValue() {
+        return userRepository.findByUserTypeAndDeletedFalseOrderByFullNameAsc(UserTypeEnum.SHOP_OWNER).stream()
+                .map(u -> new com.bt.fretchain.bean.KeyValueDto(u.getUuid(), u.getFullName() + " (" + u.getEmail() + ")"))
+                .toList();
+    }
+
+    /** Every shop gets an editable "Shop Admin" role with all activities. */
+    private void ensureAdminRole(ShopMaster shop, Long actorId) {
+        boolean exists = roleRepository.existsByShop_RecordIdAndNameIgnoreCaseAndDeletedFalse(shop.getRecordId(), ADMIN_ROLE_NAME);
+        if (!exists) {
+            ShopRole r = new ShopRole();
+            r.setShop(shop);
+            r.setName(ADMIN_ROLE_NAME);
+            r.setDescription("Full access to this shop");
+            java.util.Arrays.stream(ShopActivity.values()).filter(a -> !a.isLegacy()).forEach(r.getActivities()::add);
+            r.setCreatedBy(actorId);
+            r.setModifiedBy(actorId);
+            roleRepository.save(r);
+        }
+    }
+
+    private ShopPartnerDTO.StaffDetail ownerDetail(SystemUser u) {
+        ShopPartnerDTO.StaffDetail d = new ShopPartnerDTO.StaffDetail();
+        d.setUuid(u.getUuid());
+        d.setFullName(u.getFullName());
+        d.setEmail(u.getEmail());
+        d.setMobile(u.getMobile());
+        d.setOwner(true);
+        d.setRoleName("Owner");
+        d.setActive(u.isActive());
+        d.setLastLogin(u.getLastLogin());
+        return d;
     }
 
     // =====================================================================

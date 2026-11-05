@@ -19,7 +19,7 @@ public interface RestaurantMasterMapper {
     RestaurantMaster toEntity(RestaurantMasterDTO.SaveOrUpdate dto);
 
     @Mapping(target = "ownerUuid", source = "owner.uuid")
-    @Mapping(target = "ownerName", ignore = true)
+    @Mapping(target = "ownerName", source = "owner.fullName")
     RestaurantMasterDTO.Detail toDetailDto(RestaurantMaster entity);
 
     @Mapping(target = "owner", ignore = true)

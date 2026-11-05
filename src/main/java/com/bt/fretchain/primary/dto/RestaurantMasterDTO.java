@@ -107,6 +107,9 @@ public class RestaurantMasterDTO {
 
         @Size(min = 6, max = 60)
         private String ownerPassword;
+
+        /** Instead of a new owner: an existing RESTAURANT_OWNER who already owns other restaurants. */
+        private String existingOwnerUuid;
     }
 
     @Getter

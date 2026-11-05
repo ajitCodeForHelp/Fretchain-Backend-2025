@@ -8,7 +8,6 @@ import com.bt.fretchain.primary.pojo.SystemUser;
 import com.bt.fretchain.primary.repository.SystemUserRepository;
 import com.bt.fretchain.primary.service.AdminAuthService;
 import com.bt.fretchain.security.JwtTokenUtil;
-import com.bt.fretchain.security.PanelAccessPolicy;
 import com.bt.fretchain.primary.pojo.enums.UserTypeEnum;
 import com.bt.fretchain.utils.TextUtils;
 import lombok.RequiredArgsConstructor;
@@ -30,9 +29,7 @@ public class AdminAuthServiceImpl implements AdminAuthService {
     protected final JwtTokenUtil jwtTokenUtil;
 
     protected final SystemUserRepository systemUserRepository;
-    protected final ShopAccessService shopAccessService;
-    protected final RestaurantAccessService restaurantAccessService;
-    protected final PanelAccessPolicy panelAccess;
+    protected final PanelSessionService panelSessionService;
 
     @Override
     @Transactional
@@ -40,27 +37,26 @@ public class AdminAuthServiceImpl implements AdminAuthService {
         SystemUser user = findByUsername(userName);
         validateUser(user, password);
 
-        // Only panel users may log in here: platform admins, shop and restaurant logins
+        // Only panel users may log in here (see PanelSessionService for all user types)
         if (!user.isActive() || user.isDeleted()) {
             throw new BadRequestException("account.inactive");
         }
-        UserTypeEnum type = user.getUserType();
-        Object store = null;
-        if (type == UserTypeEnum.SHOP_USER) {
-            store = shopAccessService.session(shopAccessService.currentStaff(user));
-        } else if (type == UserTypeEnum.RESTAURANT_USER) {
-            store = restaurantAccessService.session(restaurantAccessService.currentStaff(user));
-        } else if (type == null || !panelAccess.isAdminType(type)) {
-            // same message as a wrong password: do not reveal that the account exists
-            throw new BadRequestException("Invalid Credential");
-        }
+        AdminAuthDto.UserDetails session = panelSessionService.session(user);
 
         user.setLastLogin(LocalDateTime.now());
         systemUserRepository.save(user);
         AdminAuthDto.UserDetails details = generateAuthTokenAndGetUserDetails(user);
-        details.setEmail(user.getEmail());
-        details.setStore(store);
-        return details;
+        session.setSecretKey(details.getSecretKey());
+        return session;
+    }
+
+    /** Current panel session of the logged-in user (the web panel refreshes it on every page). */
+    @Transactional(readOnly = true)
+    public AdminAuthDto.UserDetails currentSession(SystemUser user) {
+        if (!user.isActive() || user.isDeleted()) {
+            throw new com.bt.fretchain.exception.ForbiddenException("account.inactive");
+        }
+        return panelSessionService.session(user);
     }
 
     public SystemUser findByUsername(String userName) {

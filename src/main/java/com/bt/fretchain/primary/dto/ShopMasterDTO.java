@@ -100,6 +100,9 @@ public class ShopMasterDTO {
 
         @Size(min = 6, max = 60)
         private String ownerPassword;
+
+        /** Instead of a new owner: an existing SHOP_OWNER who already owns other shops. */
+        private String existingOwnerUuid;
     }
 
     @Getter

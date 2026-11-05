@@ -26,9 +26,13 @@ import java.util.*;
 public class ShopAccessService {
 
     private final ShopStaffRepository staffRepository;
+    private final com.bt.fretchain.primary.repository.ShopMasterRepository shopRepository;
 
     /** The staff record of a SHOP_USER login, or 403. */
     public ShopStaff currentStaff(SystemUser user) {
+        if (user != null && user.getUserType() == UserTypeEnum.SHOP_OWNER) {
+            return ownerContext(user);
+        }
         if (user == null || user.getUserType() != UserTypeEnum.SHOP_USER) {
             throw new ForbiddenException("access.denied");
         }
@@ -43,6 +47,47 @@ public class ShopAccessService {
             throw new ForbiddenException("store.inactive");
         }
         return staff;
+    }
+
+    /** Header the web panel sends with the shop an owner is currently working in. */
+    public static final String STORE_HEADER = "X-Store-Uuid";
+
+    /**
+     * An owner works in one of their shops at a time: the one in the X-Store-Uuid header,
+     * or their first active shop. Returned as a transient (not saved) staff record with owner = true.
+     */
+    private ShopStaff ownerContext(SystemUser user) {
+        List<ShopMaster> owned = ownedStores(user);
+        if (owned.isEmpty()) {
+            throw new ForbiddenException("store.inactive");
+        }
+        String requested = requestedStore();
+        ShopMaster shop = requested == null ? owned.get(0) : owned.stream()
+                .filter(x -> x.getUuid().equals(requested))
+                .findFirst()
+                .orElseThrow(() -> new ForbiddenException("access.denied"));
+        ShopStaff ctx = new ShopStaff();
+        ctx.setShop(shop);
+        ctx.setUser(user);
+        ctx.setOwner(true);
+        return ctx;
+    }
+
+    /** Active shops owned by the user, by name. */
+    public List<ShopMaster> ownedStores(SystemUser user) {
+        return shopRepository.findByOwnerUuid(user.getUuid()).stream()
+                .filter(x -> x.isActive() && !x.isDeleted())
+                .sorted(java.util.Comparator.comparing(ShopMaster::getNameEn, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
+
+    private static String requestedStore() {
+        var attrs = org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+        if (attrs instanceof org.springframework.web.context.request.ServletRequestAttributes sra) {
+            String v = sra.getRequest().getHeader(STORE_HEADER);
+            return v == null || v.isBlank() ? null : v.trim();
+        }
+        return null;
     }
 
     /** Effective activities: the owner has all; an inactive role has none. */
@@ -109,7 +154,7 @@ public class ShopAccessService {
         session.setStatus(shop.getStatus());
         session.setStatusReason(shop.getStatusReason());
         session.setOwner(staff.isOwner());
-        session.setRoleName(staff.getRole() != null ? staff.getRole().getName() : null);
+        session.setRoleName(staff.isOwner() ? "Owner" : staff.getRole() != null ? staff.getRole().getName() : null);
 
         // Expose VIEW activities implied by MANAGE so the UI can rely on the list alone
         List<ShopActivity> list = new ArrayList<>();

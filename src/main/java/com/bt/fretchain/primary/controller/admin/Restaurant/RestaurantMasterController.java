@@ -116,6 +116,16 @@ public class RestaurantMasterController extends _BaseController {
                 .build());
     }
 
+    /** Existing restaurant owners, for "add restaurant for an existing owner". */
+    @GetMapping("/owners/list-in-key-value")
+    public ResponseEntity<ResponseData> owners() {
+        return ResponseEntity.ok(ResponseData.builder()
+                .statusCode(200)
+                .message("record.dropdown.fetched")
+                .data(partnerService.ownerKeyValue())
+                .build());
+    }
+
     /** Owner login of the restaurant (null when not created yet). */
     @GetMapping("/{uuid}/owner")
     public ResponseEntity<ResponseData> getOwner(@PathVariable String uuid) {

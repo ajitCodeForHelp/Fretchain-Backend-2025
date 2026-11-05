@@ -65,6 +65,11 @@ public class SystemUser  extends BaseEntity implements UserDetails {
     @Enumerated(EnumType.STRING)
     private GenderTypeEnum gender;
 
+    /** ADMIN_STAFF only: the platform role that decides which admin menus / actions they get. */
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "platform_role_id")
+    private PlatformRole platformRole;
+
     @Column(name = "last_login_at")
     protected LocalDateTime lastLogin;
 

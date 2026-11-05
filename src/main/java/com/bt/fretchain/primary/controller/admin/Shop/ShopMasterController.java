@@ -117,6 +117,16 @@ public class ShopMasterController extends _BaseController {
                 .build());
     }
 
+    /** Existing shop owners, for "add shop for an existing owner". */
+    @GetMapping("/owners/list-in-key-value")
+    public ResponseEntity<ResponseData> owners() {
+        return ResponseEntity.ok(ResponseData.builder()
+                .statusCode(200)
+                .message("record.dropdown.fetched")
+                .data(partnerService.ownerKeyValue())
+                .build());
+    }
+
     /** Owner login of the shop (null when not created yet). */
     @GetMapping("/{uuid}/owner")
     public ResponseEntity<ResponseData> getOwner(@PathVariable String uuid) {

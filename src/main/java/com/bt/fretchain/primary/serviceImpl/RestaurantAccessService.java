@@ -26,9 +26,13 @@ import java.util.*;
 public class RestaurantAccessService {
 
     private final RestaurantStaffRepository staffRepository;
+    private final com.bt.fretchain.primary.repository.RestaurantMasterRepository restaurantRepository;
 
     /** The staff record of a RESTAURANT_USER login, or 403. */
     public RestaurantStaff currentStaff(SystemUser user) {
+        if (user != null && user.getUserType() == UserTypeEnum.RESTAURANT_OWNER) {
+            return ownerContext(user);
+        }
         if (user == null || user.getUserType() != UserTypeEnum.RESTAURANT_USER) {
             throw new ForbiddenException("access.denied");
         }
@@ -43,6 +47,47 @@ public class RestaurantAccessService {
             throw new ForbiddenException("store.inactive");
         }
         return staff;
+    }
+
+    /** Header the web panel sends with the restaurant an owner is currently working in. */
+    public static final String STORE_HEADER = "X-Store-Uuid";
+
+    /**
+     * An owner works in one of their restaurants at a time: the one in the X-Store-Uuid header,
+     * or their first active restaurant. Returned as a transient (not saved) staff record with owner = true.
+     */
+    private RestaurantStaff ownerContext(SystemUser user) {
+        List<RestaurantMaster> owned = ownedStores(user);
+        if (owned.isEmpty()) {
+            throw new ForbiddenException("store.inactive");
+        }
+        String requested = requestedStore();
+        RestaurantMaster restaurant = requested == null ? owned.get(0) : owned.stream()
+                .filter(x -> x.getUuid().equals(requested))
+                .findFirst()
+                .orElseThrow(() -> new ForbiddenException("access.denied"));
+        RestaurantStaff ctx = new RestaurantStaff();
+        ctx.setRestaurant(restaurant);
+        ctx.setUser(user);
+        ctx.setOwner(true);
+        return ctx;
+    }
+
+    /** Active restaurants owned by the user, by name. */
+    public List<RestaurantMaster> ownedStores(SystemUser user) {
+        return restaurantRepository.findByOwnerUuid(user.getUuid()).stream()
+                .filter(x -> x.isActive() && !x.isDeleted())
+                .sorted(java.util.Comparator.comparing(RestaurantMaster::getNameEn, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
+
+    private static String requestedStore() {
+        var attrs = org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+        if (attrs instanceof org.springframework.web.context.request.ServletRequestAttributes sra) {
+            String v = sra.getRequest().getHeader(STORE_HEADER);
+            return v == null || v.isBlank() ? null : v.trim();
+        }
+        return null;
     }
 
     /** Effective activities: the owner has all; an inactive role has none. */
@@ -109,7 +154,7 @@ public class RestaurantAccessService {
         session.setStatus(restaurant.getStatus());
         session.setStatusReason(restaurant.getStatusReason());
         session.setOwner(staff.isOwner());
-        session.setRoleName(staff.getRole() != null ? staff.getRole().getName() : null);
+        session.setRoleName(staff.isOwner() ? "Owner" : staff.getRole() != null ? staff.getRole().getName() : null);
 
         // Expose VIEW activities implied by MANAGE so the UI can rely on the list alone
         List<RestaurantActivity> list = new ArrayList<>();

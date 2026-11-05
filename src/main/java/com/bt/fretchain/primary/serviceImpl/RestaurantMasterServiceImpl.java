@@ -54,7 +54,10 @@ public class RestaurantMasterServiceImpl implements RestaurantMasterService {
             SystemUser user) {
 
         validateRestaurantCode(request.getRestaurantCode(), null);
-        validateOwner(request);
+        boolean existingOwner = !isBlank(request.getExistingOwnerUuid());
+        if (!existingOwner) {
+            validateOwner(request);
+        }
         validateTimings(request);
 
         RestaurantMaster entity = mapper.toEntity(request);
@@ -68,15 +71,20 @@ public class RestaurantMasterServiceImpl implements RestaurantMasterService {
         entity.setModifiedBy(user.getRecordId());
         entity = repository.save(entity);
 
-        // Owner login: system_user (RESTAURANT_USER) + Owner role, linked as restaurant.owner
-        RestaurantPartnerDTO.OwnerSave owner = new RestaurantPartnerDTO.OwnerSave();
-        owner.setFullName(request.getOwnerName());
-        owner.setEmail(request.getOwnerEmail());
-        owner.setMobile(request.getOwnerMobile());
-        owner.setPassword(request.getOwnerPassword());
-        partnerService.saveOwner(entity.getUuid(), owner, user);
+        if (existingOwner) {
+            // an owner who already has other restaurants
+            partnerService.assignExistingOwner(entity.getUuid(), request.getExistingOwnerUuid(), user.getRecordId());
+        } else {
+            // new owner login: system_user (RESTAURANT_OWNER), linked as restaurant.owner
+            RestaurantPartnerDTO.OwnerSave owner = new RestaurantPartnerDTO.OwnerSave();
+            owner.setFullName(request.getOwnerName());
+            owner.setEmail(request.getOwnerEmail());
+            owner.setMobile(request.getOwnerMobile());
+            owner.setPassword(request.getOwnerPassword());
+            partnerService.saveOwner(entity.getUuid(), owner, user);
+        }
 
-        return mapper.toDetailDto(entity);
+        return mapper.toDetailDto(repository.findByUuidAndDeletedFalse(entity.getUuid()).orElse(entity));
     }
 
     @Override

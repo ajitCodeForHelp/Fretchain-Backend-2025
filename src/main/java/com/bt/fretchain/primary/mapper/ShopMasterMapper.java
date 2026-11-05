@@ -19,7 +19,7 @@ public interface ShopMasterMapper {
     ShopMaster toEntity(ShopMasterDTO.SaveOrUpdate dto);
 
     @Mapping(target = "ownerUuid", source = "owner.uuid")
-    @Mapping(target = "ownerName", ignore = true)
+    @Mapping(target = "ownerName", source = "owner.fullName")
     ShopMasterDTO.Detail toDetailDto(ShopMaster entity);
 
     @Mapping(target = "owner", ignore = true)

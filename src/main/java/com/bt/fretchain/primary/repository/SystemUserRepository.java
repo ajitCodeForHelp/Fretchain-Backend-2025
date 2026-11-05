@@ -8,7 +8,8 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 @Repository
-public interface SystemUserRepository extends JpaRepository<SystemUser, Long> {
+public interface SystemUserRepository extends JpaRepository<SystemUser, Long>,
+        org.springframework.data.jpa.repository.JpaSpecificationExecutor<SystemUser> {
     Optional<SystemUser> findByEmailAndDeletedFalse(String email);
 
     Optional<SystemUser> findByMobileAndDeletedFalse(String mobile);
@@ -33,4 +34,7 @@ public interface SystemUserRepository extends JpaRepository<SystemUser, Long> {
     boolean existsByEmailIgnoreCaseAndRecordIdNot(String email, Long recordId);
 
     boolean existsByMobileAndRecordIdNot(String mobile, Long recordId);
+
+    java.util.List<SystemUser> findByUserTypeAndDeletedFalseOrderByFullNameAsc(
+            com.bt.fretchain.primary.pojo.enums.UserTypeEnum userType);
 }

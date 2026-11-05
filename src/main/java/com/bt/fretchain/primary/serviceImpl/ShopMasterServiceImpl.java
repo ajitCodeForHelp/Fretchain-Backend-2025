@@ -54,7 +54,10 @@ public class ShopMasterServiceImpl implements ShopMasterService {
             SystemUser user) {
 
         validateShopCode(request.getShopCode(), null);
-        validateOwner(request);
+        boolean existingOwner = !isBlank(request.getExistingOwnerUuid());
+        if (!existingOwner) {
+            validateOwner(request);
+        }
         validateTimings(request);
 
         ShopMaster entity = mapper.toEntity(request);
@@ -68,15 +71,20 @@ public class ShopMasterServiceImpl implements ShopMasterService {
         entity.setModifiedBy(user.getRecordId());
         entity = repository.save(entity);
 
-        // Owner login: system_user (SHOP_USER) + Owner role, linked as shop.owner
-        ShopPartnerDTO.OwnerSave owner = new ShopPartnerDTO.OwnerSave();
-        owner.setFullName(request.getOwnerName());
-        owner.setEmail(request.getOwnerEmail());
-        owner.setMobile(request.getOwnerMobile());
-        owner.setPassword(request.getOwnerPassword());
-        partnerService.saveOwner(entity.getUuid(), owner, user);
+        if (existingOwner) {
+            // an owner who already has other shops
+            partnerService.assignExistingOwner(entity.getUuid(), request.getExistingOwnerUuid(), user.getRecordId());
+        } else {
+            // new owner login: system_user (SHOP_OWNER), linked as shop.owner
+            ShopPartnerDTO.OwnerSave owner = new ShopPartnerDTO.OwnerSave();
+            owner.setFullName(request.getOwnerName());
+            owner.setEmail(request.getOwnerEmail());
+            owner.setMobile(request.getOwnerMobile());
+            owner.setPassword(request.getOwnerPassword());
+            partnerService.saveOwner(entity.getUuid(), owner, user);
+        }
 
-        return mapper.toDetailDto(entity);
+        return mapper.toDetailDto(repository.findByUuidAndDeletedFalse(entity.getUuid()).orElse(entity));
     }
 
     @Override

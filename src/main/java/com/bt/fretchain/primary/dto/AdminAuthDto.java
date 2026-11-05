@@ -25,6 +25,21 @@ public class AdminAuthDto {
         private String email;
         /** Shop / restaurant logins only: store, role and allowed activities. */
         private Object store;
+        /** Owners: all their stores (the panel lets them switch). Others: the one store. */
+        private java.util.List<StoreSummary> stores;
+        /** Admin panel permissions (full admins: all; admin staff: from their role). */
+        private java.util.List<String> activities;
+        /** Platform role name for admin staff. */
+        private String roleName;
+    }
+
+    @Setter
+    @Getter
+    public static class StoreSummary {
+        private String storeUuid;
+        private String storeName;
+        private String logoUrl;
+        private Object status;
     }
 
 }

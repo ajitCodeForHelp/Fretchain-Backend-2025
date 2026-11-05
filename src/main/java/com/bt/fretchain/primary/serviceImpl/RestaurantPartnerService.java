@@ -40,6 +40,7 @@ public class RestaurantPartnerService {
 
     private final RestaurantAccessService access;
     private final RestaurantMasterRepository restaurantRepository;
+    private final com.bt.fretchain.primary.repository.SystemUserRepository userRepository;
     private final RestaurantRoleRepository roleRepository;
     private final RestaurantStaffRepository staffRepository;
     private final RestaurantMasterMapper restaurantMapper;
@@ -360,13 +361,15 @@ public class RestaurantPartnerService {
     // Admin: owner login of a restaurant
     // =====================================================================
 
+    /** Name of the per-restaurant role with every activity, assignable to the restaurant's admin. */
+    public static final String ADMIN_ROLE_NAME = "Restaurant Admin";
+
     @Transactional(readOnly = true)
     public RestaurantPartnerDTO.StaffDetail getOwner(String restaurantUuid) {
         RestaurantMaster restaurant = restaurantRepository.findByUuidAndDeletedFalse(restaurantUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("restaurant.notfound"));
-        return staffRepository.findFirstByRestaurant_RecordIdAndOwnerTrueAndDeletedFalse(restaurant.getRecordId())
-                .map(this::toStaffDetail)
-                .orElse(null);
+        SystemUser owner = restaurant.getOwner();
+        return owner == null || owner.isDeleted() ? null : ownerDetail(owner);
     }
 
     /** Creates the owner login (first time) or updates its details / password. */
@@ -375,49 +378,80 @@ public class RestaurantPartnerService {
         return saveOwner(restaurantUuid, req, admin.getRecordId());
     }
 
-    /** actorId = admin creating the owner, or null for public self-registration. */
+    /**
+     * actorId = admin creating the owner, or null for public self-registration.
+     * New owners are RESTAURANT_OWNER logins linked through restaurant.owner (one owner can own many restaurants).
+     * Owners created before that (RESTAURANT_USER + owner staff row) are still updated in place.
+     */
     @Transactional
     public RestaurantPartnerDTO.StaffDetail saveOwner(String restaurantUuid, RestaurantPartnerDTO.OwnerSave req, Long actorId) {
         RestaurantMaster restaurant = restaurantRepository.findByUuidAndDeletedFalse(restaurantUuid)
                 .orElseThrow(() -> new ResourceNotFoundException("restaurant.notfound"));
 
-        RestaurantRole ownerRole = roleRepository.findFirstByRestaurant_RecordIdAndOwnerRoleTrueAndDeletedFalse(restaurant.getRecordId())
-                .orElseGet(() -> {
-                    RestaurantRole r = new RestaurantRole();
-                    r.setRestaurant(restaurant);
-                    r.setName(OWNER_ROLE_NAME);
-                    r.setDescription("Full access to the restaurant");
-                    r.setOwnerRole(true);
-                    r.getActivities().addAll(EnumSet.allOf(RestaurantActivity.class));
-                    r.setCreatedBy(actorId);
-                    r.setModifiedBy(actorId);
-                    return roleRepository.save(r);
-                });
-
-        RestaurantStaff owner = staffRepository.findFirstByRestaurant_RecordIdAndOwnerTrueAndDeletedFalse(restaurant.getRecordId())
-                .orElse(null);
-
-        if (owner == null) {
-            SystemUser login = loginHelper.create(req.getFullName(), req.getEmail(), req.getMobile(),
-                    req.getPassword(), UserTypeEnum.RESTAURANT_USER, actorId);
-            owner = new RestaurantStaff();
-            owner.setRestaurant(restaurant);
-            owner.setUser(login);
-            owner.setRole(ownerRole);
-            owner.setOwner(true);
-            owner.setCreatedBy(actorId);
+        SystemUser owner = restaurant.getOwner();
+        if (owner == null || owner.isDeleted()) {
+            owner = loginHelper.create(req.getFullName(), req.getEmail(), req.getMobile(),
+                    req.getPassword(), UserTypeEnum.RESTAURANT_OWNER, actorId);
         } else {
-            loginHelper.update(owner.getUser(), req.getFullName(), req.getEmail(), req.getMobile(),
+            loginHelper.update(owner, req.getFullName(), req.getEmail(), req.getMobile(),
                     req.getPassword(), actorId);
         }
-        owner.setModifiedBy(actorId);
-        owner = staffRepository.save(owner);
-
-        restaurant.setOwner(owner.getUser());
+        restaurant.setOwner(owner);
         restaurant.setModifiedBy(actorId);
         restaurantRepository.save(restaurant);
+        ensureAdminRole(restaurant, actorId);
+        return ownerDetail(owner);
+    }
 
-        return toStaffDetail(owner);
+    /** Admin: give an existing owner (who already owns other restaurants) this restaurant too. */
+    @Transactional
+    public RestaurantPartnerDTO.StaffDetail assignExistingOwner(String restaurantUuid, String ownerUuid, Long actorId) {
+        RestaurantMaster restaurant = restaurantRepository.findByUuidAndDeletedFalse(restaurantUuid)
+                .orElseThrow(() -> new ResourceNotFoundException("restaurant.notfound"));
+        SystemUser owner = userRepository.findByUuidAndDeletedFalse(ownerUuid)
+                .filter(u -> u.getUserType() == UserTypeEnum.RESTAURANT_OWNER)
+                .orElseThrow(() -> new ResourceNotFoundException("owner.notfound"));
+        restaurant.setOwner(owner);
+        restaurant.setModifiedBy(actorId);
+        restaurantRepository.save(restaurant);
+        ensureAdminRole(restaurant, actorId);
+        return ownerDetail(owner);
+    }
+
+    /** Owners for the "existing owner" dropdown. */
+    @Transactional(readOnly = true)
+    public List<com.bt.fretchain.bean.KeyValueDto> ownerKeyValue() {
+        return userRepository.findByUserTypeAndDeletedFalseOrderByFullNameAsc(UserTypeEnum.RESTAURANT_OWNER).stream()
+                .map(u -> new com.bt.fretchain.bean.KeyValueDto(u.getUuid(), u.getFullName() + " (" + u.getEmail() + ")"))
+                .toList();
+    }
+
+    /** Every restaurant gets an editable "Restaurant Admin" role with all activities. */
+    private void ensureAdminRole(RestaurantMaster restaurant, Long actorId) {
+        boolean exists = roleRepository.existsByRestaurant_RecordIdAndNameIgnoreCaseAndDeletedFalse(restaurant.getRecordId(), ADMIN_ROLE_NAME);
+        if (!exists) {
+            RestaurantRole r = new RestaurantRole();
+            r.setRestaurant(restaurant);
+            r.setName(ADMIN_ROLE_NAME);
+            r.setDescription("Full access to this restaurant");
+            java.util.Arrays.stream(RestaurantActivity.values()).filter(a -> !a.isLegacy()).forEach(r.getActivities()::add);
+            r.setCreatedBy(actorId);
+            r.setModifiedBy(actorId);
+            roleRepository.save(r);
+        }
+    }
+
+    private RestaurantPartnerDTO.StaffDetail ownerDetail(SystemUser u) {
+        RestaurantPartnerDTO.StaffDetail d = new RestaurantPartnerDTO.StaffDetail();
+        d.setUuid(u.getUuid());
+        d.setFullName(u.getFullName());
+        d.setEmail(u.getEmail());
+        d.setMobile(u.getMobile());
+        d.setOwner(true);
+        d.setRoleName("Owner");
+        d.setActive(u.isActive());
+        d.setLastLogin(u.getLastLogin());
+        return d;
     }
 
     // =====================================================================

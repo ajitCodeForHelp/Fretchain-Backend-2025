@@ -3,6 +3,7 @@ package com.bt.fretchain.security;
 import com.bt.fretchain.exception.ForbiddenException;
 import com.bt.fretchain.primary.pojo.SystemUser;
 import com.bt.fretchain.primary.pojo.enums.UserTypeEnum;
+import com.bt.fretchain.primary.serviceImpl.PlatformAccessService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +24,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 public class PanelAuthorizationInterceptor implements HandlerInterceptor {
 
     private final JwtUserDetailsService userDetailsService;
-    private final PanelAccessPolicy policy;
+    private final PlatformAccessService platformAccess;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
@@ -51,15 +52,16 @@ public class PanelAuthorizationInterceptor implements HandlerInterceptor {
 
         UserTypeEnum type = user.getUserType();
         if (adminPath) {
-            if (!policy.isAdminType(type)) {
+            // full admins: everything; admin staff: menu + action from their platform role
+            if (!platformAccess.isAllowed(user, request.getMethod(), path)) {
                 throw new ForbiddenException("access.denied");
             }
         } else if (path.startsWith("/partner/api/shop-")) {
-            if (type != UserTypeEnum.SHOP_USER) {
+            if (type != UserTypeEnum.SHOP_USER && type != UserTypeEnum.SHOP_OWNER) {
                 throw new ForbiddenException("access.denied");
             }
         } else if (path.startsWith("/partner/api/restaurant-")) {
-            if (type != UserTypeEnum.RESTAURANT_USER) {
+            if (type != UserTypeEnum.RESTAURANT_USER && type != UserTypeEnum.RESTAURANT_OWNER) {
                 throw new ForbiddenException("access.denied");
             }
         } else {
