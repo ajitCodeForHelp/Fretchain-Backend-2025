@@ -20,6 +20,12 @@ public interface DriverRepository extends
     Optional<Driver> findByUsernameAndDeletedFalse(String username);
 
     List<Driver> findByActiveTrueAndDeletedFalseOrderByFullNameAsc();
+
+    List<Driver> findByVendor_UuidAndActiveTrueAndDeletedFalseOrderByFullNameAsc(String vendorUuid);
+
+    Optional<Driver> findFirstByVehicle_RecordIdAndDeletedFalse(Long vehicleId);
+
+    long countByVendor_UuidAndDeletedFalse(String vendorUuid);
     List<AvailableDriverResponse> getAvailableDriversForOrder(
             Long orderId
     );

@@ -44,6 +44,12 @@ public class DriverDTO {
 
         private String nationalIdNumber;
         // Driver document fields
+        /** Fleet owner (vendor login uuid). Vendor panel: always the logged-in vendor. */
+        private String vendorUuid;
+
+        /** Vehicle the driver drives; must belong to the same vendor and have no other driver. */
+        private String vehicleUuid;
+
         private DriverDocumentDetail driverDocument;
 
     }
@@ -94,6 +100,10 @@ public class DriverDTO {
 
         private VehicleDTO.Basic vehicle;
 
+        private String vendorUuid;
+
+        private String vendorName;
+
         private DriverDocumentDetail driverDocument;
 
     }
@@ -142,7 +152,12 @@ public class DriverDTO {
 
         private Boolean available;
 
+        /** Legacy name of vehicleUuid. */
         private String truckUuid;
+
+        private String vehicleUuid;
+
+        private String vendorUuid;
     }
 
     @Getter

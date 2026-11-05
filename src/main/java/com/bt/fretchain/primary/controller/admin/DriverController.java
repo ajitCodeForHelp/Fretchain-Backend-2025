@@ -104,10 +104,12 @@ public class DriverController extends _BaseController {
     }
 
     @GetMapping("/list-in-key-value")
-    public ResponseEntity<ResponseData> listInKeyValue() {
+    public ResponseEntity<ResponseData> listInKeyValue(
+            @RequestParam(required = false) String vendorUuid
+    ) {
 
         List<KeyValueDto> data =
-                driverService.getKeyValueList();
+                driverService.getKeyValueList(vendorUuid);
 
         return ResponseEntity.ok(
                 ResponseData.builder()

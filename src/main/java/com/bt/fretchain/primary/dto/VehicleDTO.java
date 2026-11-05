@@ -56,6 +56,10 @@ public class VehicleDTO {
         private String vendorUuid;
         private String vendorName;
 
+        /** Driver currently assigned to this vehicle (if any). */
+        private String driverUuid;
+        private String driverName;
+
     }
 
     @Getter

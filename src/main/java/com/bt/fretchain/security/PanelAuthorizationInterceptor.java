@@ -16,6 +16,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
  *   /admin/**                     -> platform admins only (except /admin/api/auth/**)
  *   /partner/api/shop-*           -> SHOP_USER logins
  *   /partner/api/restaurant-*     -> RESTAURANT_USER logins
+ *   /partner/api/vendor-*         -> VENDOR (fleet owner) logins
  * Fine-grained activity checks happen in ShopAccessService / RestaurantAccessService.
  * Also rejects tokens of users that were deactivated or deleted after login.
  */
@@ -58,6 +59,10 @@ public class PanelAuthorizationInterceptor implements HandlerInterceptor {
             }
         } else if (path.startsWith("/partner/api/shop-")) {
             if (type != UserTypeEnum.SHOP_USER && type != UserTypeEnum.SHOP_OWNER) {
+                throw new ForbiddenException("access.denied");
+            }
+        } else if (path.startsWith("/partner/api/vendor-")) {
+            if (type != UserTypeEnum.VENDOR) {
                 throw new ForbiddenException("access.denied");
             }
         } else if (path.startsWith("/partner/api/restaurant-")) {

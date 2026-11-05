@@ -2,11 +2,13 @@ package com.bt.fretchain.primary.serviceImpl;
 
 import com.bt.fretchain.bean.DataTableResponsePacket;
 import com.bt.fretchain.bean.KeyValueDto;
+import com.bt.fretchain.exception.BadRequestException;
 import com.bt.fretchain.exception.DuplicateResourceException;
 import com.bt.fretchain.exception.ResourceNotFoundException;
 import com.bt.fretchain.primary.dto.VehicleDTO;
 import com.bt.fretchain.primary.mapper.VehicleMapper;
 import com.bt.fretchain.primary.pojo.SystemUser;
+import com.bt.fretchain.primary.pojo.enums.UserTypeEnum;
 import com.bt.fretchain.primary.pojo.Vehicle;
 import com.bt.fretchain.primary.pojo.VehicleCategory;
 import com.bt.fretchain.primary.repository.SystemUserRepository;
@@ -115,6 +117,18 @@ public class VehicleServiceImpl implements VehicleService {
     }
 
     @Override
+    public List<KeyValueDto> getKeyValueList(String vendorUuid) {
+        if (vendorUuid == null || vendorUuid.isBlank()) {
+            return getKeyValueList();
+        }
+        return vehicleRepository
+                .findByVendor_UuidAndActiveTrueAndDeletedFalseOrderByVehicleNumberAsc(vendorUuid)
+                .stream()
+                .map(v -> new KeyValueDto(v.getUuid(), v.getVehicleNumber()))
+                .toList();
+    }
+
+    @Override
     public List<KeyValueDto> getKeyValueList() {
 
         return vehicleRepository
@@ -137,17 +151,26 @@ public class VehicleServiceImpl implements VehicleService {
 
         entity.setVehicleCategory(vehicleCategory);
 
+        SystemUser vendor = null;
         if (request.getVendorUuid() != null
                 && !request.getVendorUuid().isBlank()) {
 
-            SystemUser vendor = systemUserRepository
+            // only vendor (fleet owner) logins can own vehicles
+            vendor = systemUserRepository
                     .findByUuidAndDeletedFalse(request.getVendorUuid())
+                    .filter(u -> u.getUserType() == UserTypeEnum.VENDOR)
                     .orElseThrow(() -> new ResourceNotFoundException("vendor.notfound"));
-
-            entity.setVendor(vendor);
-        } else {
-            entity.setVendor(null);
         }
+
+        // a driver of another fleet cannot stay on the vehicle when its vendor changes
+        if (entity.getDriver() != null && !entity.getDriver().isDeleted()) {
+            String driverVendor = entity.getDriver().getVendor() == null ? null : entity.getDriver().getVendor().getUuid();
+            String vehicleVendor = vendor == null ? null : vendor.getUuid();
+            if (!java.util.Objects.equals(driverVendor, vehicleVendor)) {
+                throw new BadRequestException("vehicle.driver.vendor.mismatch");
+            }
+        }
+        entity.setVendor(vendor);
     }
 
     private Pageable pageRequestCreate(
@@ -181,11 +204,13 @@ public class VehicleServiceImpl implements VehicleService {
 
             List<Predicate> predicates = new ArrayList<>();
 
-            root.fetch("vehicleCategory", JoinType.LEFT);
-            root.fetch("vendor", JoinType.LEFT);
-            root.fetch("driver", JoinType.LEFT);
-
-            query.distinct(true);
+            // fetch joins only for the data query (the page count query cannot fetch)
+            if (query.getResultType() != Long.class && query.getResultType() != long.class) {
+                root.fetch("vehicleCategory", JoinType.LEFT);
+                root.fetch("vendor", JoinType.LEFT);
+                root.fetch("driver", JoinType.LEFT);
+                query.distinct(true);
+            }
 
             predicates.add(cb.equal(root.get("deleted"), false));
 

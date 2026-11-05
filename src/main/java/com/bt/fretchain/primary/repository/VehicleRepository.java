@@ -24,4 +24,8 @@ public interface VehicleRepository extends
     );
 
     List<Vehicle> findByActiveTrueAndDeletedFalseOrderByVehicleNumberAsc();
+
+    List<Vehicle> findByVendor_UuidAndActiveTrueAndDeletedFalseOrderByVehicleNumberAsc(String vendorUuid);
+
+    long countByVendor_UuidAndDeletedFalse(String vendorUuid);
 }

@@ -2,6 +2,7 @@ package com.bt.fretchain.primary.serviceImpl;
 
 import com.bt.fretchain.bean.DataTableResponsePacket;
 import com.bt.fretchain.bean.KeyValueDto;
+import com.bt.fretchain.exception.BadRequestException;
 import com.bt.fretchain.exception.DuplicateResourceException;
 import com.bt.fretchain.exception.ResourceNotFoundException;
 import com.bt.fretchain.primary.dto.DriverDTO;
@@ -9,6 +10,9 @@ import com.bt.fretchain.primary.mapper.DriverMapper;
 import com.bt.fretchain.primary.pojo.Driver;
 import com.bt.fretchain.primary.pojo.DriverDocument;
 import com.bt.fretchain.primary.pojo.SystemUser;
+import com.bt.fretchain.primary.pojo.Vehicle;
+import com.bt.fretchain.primary.pojo.enums.UserTypeEnum;
+import com.bt.fretchain.primary.repository.VehicleRepository;
 import com.bt.fretchain.primary.repository.DriverRepository;
 import com.bt.fretchain.primary.repository.SystemUserRepository;
 import com.bt.fretchain.primary.service.DriverService;
@@ -23,6 +27,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +37,7 @@ public class DriverServiceImpl implements DriverService {
     private final SystemUserRepository systemUserRepository;
     private final DriverMapper driverMapper;
     private final PasswordEncoder passwordEncoder;
+    private final VehicleRepository vehicleRepository;
 
     @Override
     public DriverDTO.Detail save(
@@ -44,6 +50,8 @@ public class DriverServiceImpl implements DriverService {
         Driver entity = driverMapper.toEntity(request);
 
         entity.setJoiningDate(LocalDateTime.now());
+
+        setRelations(entity, request);
 
         setEncodedPassword(
                 entity,
@@ -83,6 +91,8 @@ public class DriverServiceImpl implements DriverService {
         validateDuplicateForUpdate(request, entity);
 
         driverMapper.updateEntityFromDto(request, entity);
+
+        setRelations(entity, request);
 
         setEncodedPassword(
                 entity,
@@ -125,6 +135,10 @@ public class DriverServiceImpl implements DriverService {
             DriverDocument document,
             SystemUser user
     ) {
+
+        if (request.getDriverDocument() == null) {
+            return document;   // documents not sent: keep what is saved
+        }
 
         if (document == null) {
 
@@ -210,6 +224,56 @@ public class DriverServiceImpl implements DriverService {
         entity.setModifiedBy(user.getRecordId());
 
         driverRepository.save(entity);
+    }
+
+    @Override
+    public List<KeyValueDto> getKeyValueList(String vendorUuid) {
+        if (vendorUuid == null || vendorUuid.isBlank()) {
+            return getKeyValueList();
+        }
+        return driverRepository
+                .findByVendor_UuidAndActiveTrueAndDeletedFalseOrderByFullNameAsc(vendorUuid)
+                .stream()
+                .map(d -> new KeyValueDto(d.getUuid(), d.getFullName()))
+                .toList();
+    }
+
+    /**
+     * Fleet owner and vehicle of the driver:
+     *  - the vendor must be a VENDOR login
+     *  - the vehicle must be active, belong to the same vendor (or both none) and have no other driver
+     */
+    private void setRelations(Driver entity, DriverDTO.SaveOrUpdate request) {
+        SystemUser vendor = null;
+        if (request.getVendorUuid() != null && !request.getVendorUuid().isBlank()) {
+            vendor = systemUserRepository.findByUuidAndDeletedFalse(request.getVendorUuid())
+                    .filter(u -> u.getUserType() == UserTypeEnum.VENDOR)
+                    .orElseThrow(() -> new ResourceNotFoundException("vendor.notfound"));
+        }
+        entity.setVendor(vendor);
+
+        Vehicle vehicle = null;
+        if (request.getVehicleUuid() != null && !request.getVehicleUuid().isBlank()) {
+            vehicle = vehicleRepository.findByUuidAndDeletedFalse(request.getVehicleUuid())
+                    .orElseThrow(() -> new ResourceNotFoundException("vehicle.notfound"));
+            boolean sameVehicle = entity.getVehicle() != null
+                    && entity.getVehicle().getRecordId().equals(vehicle.getRecordId());
+            if (!vehicle.isActive() && !sameVehicle) {
+                throw new BadRequestException("vehicle.inactive");
+            }
+            String vehicleVendor = vehicle.getVendor() == null ? null : vehicle.getVendor().getUuid();
+            String driverVendor = vendor == null ? null : vendor.getUuid();
+            if (!Objects.equals(vehicleVendor, driverVendor)) {
+                throw new BadRequestException("driver.vehicle.vendor.mismatch");
+            }
+            Long vehicleId = vehicle.getRecordId();
+            driverRepository.findFirstByVehicle_RecordIdAndDeletedFalse(vehicleId)
+                    .filter(other -> entity.getRecordId() == null || !other.getRecordId().equals(entity.getRecordId()))
+                    .ifPresent(other -> {
+                        throw new DuplicateResourceException("vehicle.driver.assigned");
+                    });
+        }
+        entity.setVehicle(vehicle);
     }
 
     @Override
@@ -418,17 +482,16 @@ public class DriverServiceImpl implements DriverService {
                     );
                 }
 
-                if (request.getFilters().getTruckUuid() != null
-                        && !request.getFilters()
-                        .getTruckUuid()
-                        .isBlank()) {
+                String vehicleUuid = request.getFilters().getVehicleUuid() != null
+                        ? request.getFilters().getVehicleUuid()
+                        : request.getFilters().getTruckUuid();
+                if (vehicleUuid != null && !vehicleUuid.isBlank()) {
+                    predicates.add(cb.equal(root.get("vehicle").get("uuid"), vehicleUuid));
+                }
 
-                    predicates.add(
-                            cb.equal(
-                                    root.get("truck").get("uuid"),
-                                    request.getFilters().getTruckUuid()
-                            )
-                    );
+                if (request.getFilters().getVendorUuid() != null
+                        && !request.getFilters().getVendorUuid().isBlank()) {
+                    predicates.add(cb.equal(root.get("vendor").get("uuid"), request.getFilters().getVendorUuid()));
                 }
             }
 

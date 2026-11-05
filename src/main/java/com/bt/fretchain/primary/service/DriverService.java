@@ -33,4 +33,7 @@ public interface DriverService {
     );
 
     List<KeyValueDto> getKeyValueList();
+
+    /** Active records of one vendor (blank = all). */
+    List<KeyValueDto> getKeyValueList(String vendorUuid);
 }

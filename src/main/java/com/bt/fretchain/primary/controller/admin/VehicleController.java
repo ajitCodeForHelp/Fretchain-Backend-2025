@@ -105,9 +105,11 @@ public class VehicleController extends _BaseController {
     }
 
     @GetMapping("/list-in-key-value")
-    public ResponseEntity<ResponseData> listInKeyValue() {
+    public ResponseEntity<ResponseData> listInKeyValue(
+            @RequestParam(required = false) String vendorUuid
+    ) {
 
-        List<KeyValueDto> data = vehicleService.getKeyValueList();
+        List<KeyValueDto> data = vehicleService.getKeyValueList(vendorUuid);
 
         return ResponseEntity.ok(
                 ResponseData.builder()

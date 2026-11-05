@@ -20,6 +20,7 @@ import java.util.List;
  *   SHOP_OWNER              -> all their shops (switchable), everything in each
  *   SHOP_USER               -> one shop, activities of their shop role
  *   RESTAURANT_OWNER / USER -> same for restaurants
+ *   VENDOR                  -> vendor panel: own company, vehicles and drivers
  *
  * Used at login and by GET /admin/api/auth/session (the panel refreshes it on every page).
  */
@@ -30,6 +31,7 @@ public class PanelSessionService {
     private final PlatformAccessService platformAccess;
     private final ShopAccessService shopAccess;
     private final RestaurantAccessService restaurantAccess;
+    private final VendorService vendorService;
 
     @Transactional(readOnly = true)
     public AdminAuthDto.UserDetails session(SystemUser user) {
@@ -55,6 +57,9 @@ public class PanelSessionService {
             d.setStores(type == UserTypeEnum.RESTAURANT_OWNER
                     ? restaurantAccess.ownedStores(user).stream().map(PanelSessionService::summary).toList()
                     : List.of(summary(store.getStoreUuid(), store.getStoreName(), store.getLogoUrl(), store.getStatus())));
+        } else if (type == UserTypeEnum.VENDOR) {
+            // fleet owner: own company, vehicles and drivers
+            d.setVendor(vendorService.session(user));
         } else {
             // customers, drivers, ... are not panel users (same message as a wrong password)
             throw new BadRequestException("Invalid Credential");

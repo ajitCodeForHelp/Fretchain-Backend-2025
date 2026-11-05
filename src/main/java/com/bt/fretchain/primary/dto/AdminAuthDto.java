@@ -29,6 +29,8 @@ public class AdminAuthDto {
         private java.util.List<StoreSummary> stores;
         /** Admin panel permissions (full admins: all; admin staff: from their role). */
         private java.util.List<String> activities;
+        /** Vendor (fleet owner) logins: company summary. */
+        private Object vendor;
         /** Platform role name for admin staff. */
         private String roleName;
     }
