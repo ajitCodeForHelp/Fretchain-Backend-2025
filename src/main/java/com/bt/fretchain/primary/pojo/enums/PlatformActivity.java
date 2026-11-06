@@ -15,6 +15,8 @@ public enum PlatformActivity {
 
     // menu-group                    resources (path segment after /admin/api/)
     DASHBOARD_VIEW(Menu.DASHBOARD, Action.VIEW),
+    /** Revenue / payment figures on the dashboard (e.g. for an Accountant role). */
+    FINANCE_VIEW(Menu.FINANCE, Action.VIEW),
     ORDER_VIEW(Menu.ORDER, Action.VIEW), ORDER_ADD(Menu.ORDER, Action.ADD), ORDER_EDIT(Menu.ORDER, Action.EDIT), ORDER_STATUS(Menu.ORDER, Action.STATUS),
     BANNER_VIEW(Menu.BANNER, Action.VIEW), BANNER_ADD(Menu.BANNER, Action.ADD), BANNER_EDIT(Menu.BANNER, Action.EDIT), BANNER_STATUS(Menu.BANNER, Action.STATUS),
     COUPON_VIEW(Menu.COUPON, Action.VIEW), COUPON_ADD(Menu.COUPON, Action.ADD), COUPON_EDIT(Menu.COUPON, Action.EDIT), COUPON_STATUS(Menu.COUPON, Action.STATUS),
@@ -32,7 +34,8 @@ public enum PlatformActivity {
 
     /** Admin-panel menus and the /admin/api resources each one covers. */
     public enum Menu {
-        DASHBOARD(),
+        DASHBOARD("dashboard"),
+        FINANCE(),
         ORDER("freight-order"),
         BANNER("banner"),
         COUPON("coupon"),
