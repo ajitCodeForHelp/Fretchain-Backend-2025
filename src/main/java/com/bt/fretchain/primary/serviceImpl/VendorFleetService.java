@@ -49,14 +49,14 @@ public class VendorFleetService {
 
     @Transactional
     public VehicleDTO.Detail saveVehicle(SystemUser user, VehicleDTO.SaveOrUpdate req) {
-        req.setVendorUuid(vendorUuid(user));
+        req.setVendorUuid(writeVendorUuid(user));
         req.setVerified(false);   // the admin verifies vehicles
         return vehicleService.save(req, user);
     }
 
     @Transactional
     public VehicleDTO.Detail updateVehicle(SystemUser user, String uuid, VehicleDTO.SaveOrUpdate req) {
-        String vendor = vendorUuid(user);
+        String vendor = writeVendorUuid(user);
         VehicleDTO.Detail existing = ownVehicle(vendor, uuid);
         req.setVendorUuid(vendor);
         req.setVerified(existing.getVerified());
@@ -99,13 +99,13 @@ public class VendorFleetService {
 
     @Transactional
     public DriverDTO.Detail saveDriver(SystemUser user, DriverDTO.SaveOrUpdate req) {
-        req.setVendorUuid(vendorUuid(user));
-        return driverService.save(req, user);
+        req.setVendorUuid(writeVendorUuid(user));
+        return driverService.saveUnverified(req, user);
     }
 
     @Transactional
     public DriverDTO.Detail updateDriver(SystemUser user, String uuid, DriverDTO.SaveOrUpdate req) {
-        String vendor = vendorUuid(user);
+        String vendor = writeVendorUuid(user);
         ownDriver(vendor, uuid);
         req.setVendorUuid(vendor);
         return driverService.update(uuid, req, user);
@@ -123,6 +123,11 @@ public class VendorFleetService {
     }
 
     // ---------------------------------------------------------------- helpers
+
+    /** Writes need an approved vendor. */
+    private String writeVendorUuid(SystemUser user) {
+        return vendorService.currentApproved(user).getUser().getUuid();
+    }
 
     /** Vehicles and drivers reference the vendor's login user. */
     private String vendorUuid(SystemUser user) {

@@ -39,10 +39,42 @@ public class DriverServiceImpl implements DriverService {
     private final PasswordEncoder passwordEncoder;
     private final VehicleRepository vehicleRepository;
 
+    /** Admin-created drivers are trusted: verified at once. */
     @Override
     public DriverDTO.Detail save(
             DriverDTO.SaveOrUpdate request,
             SystemUser user
+    ) {
+        return doSave(request, user, true);
+    }
+
+    @Override
+    public DriverDTO.Detail saveUnverified(
+            DriverDTO.SaveOrUpdate request,
+            SystemUser user
+    ) {
+        return doSave(request, user, false);
+    }
+
+    @Override
+    public void updateVerification(String uuid, Boolean verified, SystemUser user) {
+        Driver entity = driverRepository
+                .findByUuidAndDeletedFalse(uuid)
+                .orElseThrow(() -> new ResourceNotFoundException("record.notfound"));
+        entity.setVerified(Boolean.TRUE.equals(verified));
+        entity.setModifiedBy(actorId(user));
+        driverRepository.save(entity);
+    }
+
+    /** user is null for public sign-ups. */
+    private static Long actorId(SystemUser user) {
+        return user == null ? null : user.getRecordId();
+    }
+
+    private DriverDTO.Detail doSave(
+            DriverDTO.SaveOrUpdate request,
+            SystemUser user,
+            boolean verified
     ) {
 
         validateDuplicate(request);
@@ -58,8 +90,9 @@ public class DriverServiceImpl implements DriverService {
                 request.getPassword()
         );
 
-        entity.setCreatedBy(user.getRecordId());
-        entity.setModifiedBy(user.getRecordId());
+        entity.setVerified(verified);
+        entity.setCreatedBy(actorId(user));
+        entity.setModifiedBy(actorId(user));
 
         entity.setDriverDocument(
                 buildDriverDocument(
@@ -146,7 +179,7 @@ public class DriverServiceImpl implements DriverService {
 
             document.setDriver(driver);
 
-            document.setCreatedBy(user.getRecordId());
+            document.setCreatedBy(actorId(user));
         }
 
         document.setIdentityNumber(
@@ -189,7 +222,7 @@ public class DriverServiceImpl implements DriverService {
                 request.getDriverDocument().getReferenceMobile()
         );
 
-        document.setModifiedBy(user.getRecordId());
+        document.setModifiedBy(actorId(user));
 
         return document;
     }

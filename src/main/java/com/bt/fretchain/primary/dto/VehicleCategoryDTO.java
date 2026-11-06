@@ -63,6 +63,9 @@ public class VehicleCategoryDTO {
 
         private Integer sortOrder;
 
+        /** Services this category can serve (blank = freight only). */
+        private java.util.Set<com.bt.fretchain.primary.pojo.enums.DeliveryService> services = new java.util.LinkedHashSet<>();
+
     }
 
     @Getter
@@ -95,6 +98,8 @@ public class VehicleCategoryDTO {
         private Boolean cashServices;
 
         private Integer sortOrder;
+
+        private java.util.Set<com.bt.fretchain.primary.pojo.enums.DeliveryService> services;
     }
 
     @Getter

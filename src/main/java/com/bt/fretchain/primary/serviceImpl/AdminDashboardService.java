@@ -55,6 +55,9 @@ public class AdminDashboardService {
         if (can.contains(PlatformActivity.VEHICLE_VIEW)) {
             attention.add(alert("unverifiedVehicles", q.count("select count(v) from Vehicle v where v.deleted = false and v.active = true and (v.verified = false or v.verified is null)"), "warning", "/vehicle"));
         }
+        if (can.contains(PlatformActivity.VENDOR_VIEW)) {
+            attention.add(alert("pendingVendors", q.count("select count(v) from VendorMaster v where v.deleted = false and v.status = ?1", com.bt.fretchain.primary.pojo.enums.VendorStatus.PENDING), "warning", "/vendor"));
+        }
         if (can.contains(PlatformActivity.DRIVER_VIEW)) {
             attention.add(alert("unverifiedDrivers", q.count("select count(d) from Driver d where d.deleted = false and d.active = true and (d.verified = false or d.verified is null)"), "warning", "/driver"));
             attention.add(alert("expiredLicenses", q.count("select count(d) from Driver d where d.deleted = false and d.active = true and d.licenseExpiryDate < current_date"), "danger", "/driver"));
@@ -110,6 +113,13 @@ public class AdminDashboardService {
         if (can.contains(PlatformActivity.VENDOR_VIEW)) {
             fleet.add(stat("vendors", q.count("select count(v) from VendorMaster v where v.deleted = false"), "NUMBER", "vendor", "purple", "/vendor"));
             fleet.add(stat("activeVendors", q.count("select count(v) from VendorMaster v where v.deleted = false and v.active = true"), "NUMBER", "active", "green", "/vendor"));
+            List<Map<String, Object>> pendingVendors = new ArrayList<>();
+            for (Object[] o : q.rows("select v.companyName, v.city, v.createdAt, v.uuid from VendorMaster v where v.deleted = false and v.status = ?1 order by v.createdAt asc", 5, com.bt.fretchain.primary.pojo.enums.VendorStatus.PENDING)) {
+                pendingVendors.add(row(String.valueOf(o[0]), o[1] == null ? "" : String.valueOf(o[1]), "PENDING", "warning", String.valueOf(o[2]), "/vendorApproval/" + o[3]));
+            }
+            if (!pendingVendors.isEmpty()) {
+                fleet.add(list("pendingVendorList", pendingVendors, "/vendor"));
+            }
             fleet.add(breakdown("topVendors", q.breakdown("select v.vendor.fullName, count(v) from Vehicle v where v.deleted = false and v.vendor is not null group by v.vendor.fullName order by count(v) desc", 6), "NUMBER"));
         }
 

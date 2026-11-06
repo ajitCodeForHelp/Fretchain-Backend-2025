@@ -49,6 +49,12 @@ public class VendorController extends _BaseController {
         return ok(null, "status.updated");
     }
 
+    /** Approve / reject / suspend (needs VENDOR_STATUS). */
+    @PatchMapping("/{uuid}/approval")
+    public ResponseEntity<ResponseData> approval(@PathVariable String uuid, @Valid @RequestBody VendorDTO.ApprovalUpdate req) {
+        return ok(service.changeStatus(uuid, req, getLoggedInUser()), "status.updated");
+    }
+
     private ResponseEntity<ResponseData> ok(Object data, String message) {
         return ResponseEntity.ok(ResponseData.builder().statusCode(200).message(message).data(data).build());
     }

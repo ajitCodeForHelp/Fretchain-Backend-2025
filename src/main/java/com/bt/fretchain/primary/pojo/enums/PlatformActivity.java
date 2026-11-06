@@ -36,7 +36,7 @@ public enum PlatformActivity {
     public enum Menu {
         DASHBOARD("dashboard"),
         FINANCE(),
-        ORDER("freight-order"),
+        ORDER("freight-order", "dispatch"),
         BANNER("banner"),
         COUPON("coupon"),
         CATEGORY("category", "sub-category"),

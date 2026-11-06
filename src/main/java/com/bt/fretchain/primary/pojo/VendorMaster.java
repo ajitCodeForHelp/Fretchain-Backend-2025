@@ -63,4 +63,22 @@ public class VendorMaster extends BaseEntity {
 
     @Column(name = "commission_percentage", precision = 5, scale = 2)
     private java.math.BigDecimal commissionPercentage;
+
+    /** Null (older rows) means APPROVED. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20)
+    private com.bt.fretchain.primary.pojo.enums.VendorStatus status = com.bt.fretchain.primary.pojo.enums.VendorStatus.APPROVED;
+
+    @Column(name = "status_reason", length = 500)
+    private String statusReason;
+
+    @Column(name = "status_changed_at")
+    private java.time.LocalDateTime statusChangedAt;
+
+    @Column(name = "self_registered")
+    private Boolean selfRegistered = false;
+
+    public boolean isApproved() {
+        return status == null || status == com.bt.fretchain.primary.pojo.enums.VendorStatus.APPROVED;
+    }
 }

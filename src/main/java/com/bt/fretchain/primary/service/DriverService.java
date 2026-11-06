@@ -14,6 +14,14 @@ public interface DriverService {
             SystemUser user
     );
 
+    /** Created by a vendor or by public sign-up: the driver must be verified by the platform before logging in. */
+    DriverDTO.Detail saveUnverified(
+            DriverDTO.SaveOrUpdate request,
+            SystemUser user
+    );
+
+    void updateVerification(String uuid, Boolean verified, SystemUser user);
+
     DriverDTO.Detail update(
             String uuid,
             DriverDTO.SaveOrUpdate request,

@@ -63,4 +63,13 @@ public class PlatformSetting extends BaseEntity {
     @Column(name = "twitter_url", length = 1000)
     private String twitterUrl;
 
+
+    /** How shop / food orders are assigned to drivers (default MANUAL). */
+    @jakarta.persistence.Enumerated(jakarta.persistence.EnumType.STRING)
+    @Column(name = "store_assignment_mode", length = 10)
+    private com.bt.fretchain.primary.pojo.enums.AssignmentMode storeAssignmentMode = com.bt.fretchain.primary.pojo.enums.AssignmentMode.MANUAL;
+
+    /** Search radius around the store for shop / food deliveries. */
+    @Column(name = "store_assignment_radius_km")
+    private Double storeAssignmentRadiusKm = 5.0;
 }

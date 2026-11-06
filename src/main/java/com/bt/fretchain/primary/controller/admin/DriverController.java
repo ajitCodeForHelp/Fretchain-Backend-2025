@@ -103,6 +103,17 @@ public class DriverController extends _BaseController {
         );
     }
 
+    /** Platform verification of a driver (needs DRIVER_STATUS). Unverified drivers cannot log in to the driver app. */
+    @PatchMapping("/{uuid}/verification")
+    public ResponseEntity<ResponseData> verification(
+            @PathVariable String uuid,
+            @RequestParam Boolean verified
+    ) {
+        driverService.updateVerification(uuid, verified, getLoggedInUser());
+        return ResponseEntity.ok(ResponseData.builder()
+                .statusCode(200).message("status.updated").build());
+    }
+
     @GetMapping("/list-in-key-value")
     public ResponseEntity<ResponseData> listInKeyValue(
             @RequestParam(required = false) String vendorUuid

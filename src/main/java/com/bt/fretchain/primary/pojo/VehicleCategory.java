@@ -68,4 +68,20 @@ public class VehicleCategory extends BaseEntity {
 
     @Column(name = "sort_order")
     private Integer sortOrder;
+
+    /**
+     * Services this category can serve. Empty (older rows) means freight only.
+     * e.g. a bike: SHOP_DELIVERY + FOOD_DELIVERY; a truck: FREIGHT.
+     */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @Enumerated(EnumType.STRING)
+    @CollectionTable(name = "vehicle_category_service", joinColumns = @JoinColumn(name = "vehicle_category_id"))
+    @Column(name = "service", length = 30, nullable = false)
+    private java.util.Set<com.bt.fretchain.primary.pojo.enums.DeliveryService> services = new java.util.LinkedHashSet<>();
+
+    public boolean supports(com.bt.fretchain.primary.pojo.enums.DeliveryService service) {
+        return services == null || services.isEmpty()
+                ? service == com.bt.fretchain.primary.pojo.enums.DeliveryService.FREIGHT
+                : services.contains(service);
+    }
 }

@@ -10,6 +10,7 @@ import com.bt.fretchain.primary.dto.VendorDTO;
 import com.bt.fretchain.primary.pojo.SystemUser;
 import com.bt.fretchain.primary.pojo.VendorMaster;
 import com.bt.fretchain.primary.pojo.enums.UserTypeEnum;
+import com.bt.fretchain.primary.pojo.enums.VendorStatus;
 import com.bt.fretchain.primary.repository.DriverRepository;
 import com.bt.fretchain.primary.repository.SystemUserRepository;
 import com.bt.fretchain.primary.repository.VehicleRepository;
@@ -26,6 +27,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -37,6 +39,13 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 public class VendorService {
+
+    /** Allowed status changes through the approval action (same rules as shops). */
+    private static final java.util.Map<VendorStatus, Set<VendorStatus>> TRANSITIONS = java.util.Map.of(
+            VendorStatus.PENDING, java.util.EnumSet.of(VendorStatus.APPROVED, VendorStatus.REJECTED),
+            VendorStatus.REJECTED, java.util.EnumSet.of(VendorStatus.APPROVED, VendorStatus.PENDING),
+            VendorStatus.APPROVED, java.util.EnumSet.of(VendorStatus.SUSPENDED),
+            VendorStatus.SUSPENDED, java.util.EnumSet.of(VendorStatus.APPROVED));
 
     private final VendorMasterRepository vendorRepository;
     private final SystemUserRepository userRepository;
@@ -65,6 +74,13 @@ public class VendorService {
                 if (req.getFilters().getActive() != null) {
                     p.add(cb.equal(root.get("active"), req.getFilters().getActive()));
                 }
+                if (req.getFilters().getStatus() != null) {
+                    if (req.getFilters().getStatus() == VendorStatus.APPROVED) {
+                        p.add(cb.or(cb.isNull(root.get("status")), cb.equal(root.get("status"), VendorStatus.APPROVED)));
+                    } else {
+                        p.add(cb.equal(root.get("status"), req.getFilters().getStatus()));
+                    }
+                }
                 if (req.getFilters().getCity() != null && !req.getFilters().getCity().isBlank()) {
                     p.add(cb.equal(cb.lower(root.get("city")), req.getFilters().getCity().trim().toLowerCase()));
                 }
@@ -78,6 +94,7 @@ public class VendorService {
     @Transactional(readOnly = true)
     public List<KeyValueDto> keyValue() {
         return vendorRepository.findByActiveTrueAndDeletedFalseOrderByCompanyNameAsc().stream()
+                .filter(VendorMaster::isApproved)
                 .map(v -> new KeyValueDto(v.getUser().getUuid(), v.getCompanyName()))
                 .toList();
     }
@@ -104,6 +121,8 @@ public class VendorService {
         v.setUser(user);
         applyProfile(v, req);
         v.setCommissionPercentage(req.getCommissionPercentage());
+        v.setStatus(VendorStatus.APPROVED);
+        v.setSelfRegistered(false);
         v.setCreatedBy(actor.getRecordId());
         v.setModifiedBy(actor.getRecordId());
         return toDetail(vendorRepository.save(v));
@@ -132,6 +151,69 @@ public class VendorService {
         v.setModifiedBy(actor.getRecordId());
         vendorRepository.save(v);
         loginHelper.setActive(v.getUser(), active, actor.getRecordId());
+    }
+
+    // ---------------------------------------------------------------- public sign-up and approval
+
+    /** Public: a vendor signs up. It starts PENDING and can log in, but cannot add vehicles / drivers until approved. */
+    @Transactional
+    public VendorDTO.Detail register(VendorDTO.Register req) {
+        String name = req.getCompanyName().trim();
+        if (vendorRepository.existsByCompanyNameIgnoreCaseAndDeletedFalse(name)) {
+            throw new DuplicateResourceException("vendor.name.exists");
+        }
+        SystemUser user = loginHelper.create(name, req.getLoginEmail(), req.getLoginMobile(),
+                req.getPassword(), UserTypeEnum.VENDOR, null);
+        VendorMaster v = new VendorMaster();
+        v.setUser(user);
+        applyProfile(v, req);
+        v.setStatus(VendorStatus.PENDING);
+        v.setSelfRegistered(true);
+        v.setStatusChangedAt(LocalDateTime.now());
+        return toDetail(vendorRepository.save(v));
+    }
+
+    @Transactional
+    public VendorDTO.Detail changeStatus(String uuid, VendorDTO.ApprovalUpdate req, SystemUser admin) {
+        VendorMaster v = find(uuid);
+        VendorStatus current = v.getStatus() == null ? VendorStatus.APPROVED : v.getStatus();
+        VendorStatus next = req.getStatus();
+        if (!TRANSITIONS.getOrDefault(current, Set.of()).contains(next)) {
+            throw new BadRequestException("approval.transition.invalid");
+        }
+        boolean needsReason = next == VendorStatus.REJECTED || next == VendorStatus.SUSPENDED;
+        if (needsReason && (req.getReason() == null || req.getReason().isBlank())) {
+            throw new BadRequestException("approval.reason.required");
+        }
+        v.setStatus(next);
+        v.setStatusReason(needsReason ? req.getReason().trim() : null);
+        v.setStatusChangedAt(LocalDateTime.now());
+        v.setModifiedBy(admin.getRecordId());
+        return toDetail(vendorRepository.save(v));
+    }
+
+    /** A rejected vendor fixed its details and asks for a new review. */
+    @Transactional
+    public VendorDTO.Session resubmit(SystemUser user) {
+        VendorMaster v = current(user);
+        if (v.getStatus() != VendorStatus.REJECTED) {
+            throw new BadRequestException("store.resubmit.invalid");
+        }
+        v.setStatus(VendorStatus.PENDING);
+        v.setStatusReason(null);
+        v.setStatusChangedAt(LocalDateTime.now());
+        vendorRepository.save(v);
+        return session(user);
+    }
+
+    /** Fleet changes (vehicles, drivers) need an approved vendor. */
+    @Transactional(readOnly = true)
+    public VendorMaster currentApproved(SystemUser user) {
+        VendorMaster v = current(user);
+        if (!v.isApproved()) {
+            throw new BadRequestException("vendor.notapproved");
+        }
+        return v;
     }
 
     // ---------------------------------------------------------------- vendor panel
@@ -190,6 +272,8 @@ public class VendorService {
         VendorDTO.Session s = new VendorDTO.Session();
         s.setVendorUuid(v.getUuid());
         s.setUserUuid(user.getUuid());
+        s.setStatus(v.getStatus() == null ? VendorStatus.APPROVED : v.getStatus());
+        s.setStatusReason(v.getStatusReason());
         s.setCompanyName(v.getCompanyName());
         s.setLogoUrl(v.getLogoUrl());
         s.setVehicleCount(vehicleRepository.countByVendor_UuidAndDeletedFalse(user.getUuid()));
@@ -246,6 +330,9 @@ public class VendorService {
         d.setLastLogin(u.getLastLogin());
         d.setVehicleCount(vehicleRepository.countByVendor_UuidAndDeletedFalse(u.getUuid()));
         d.setDriverCount(driverRepository.countByVendor_UuidAndDeletedFalse(u.getUuid()));
+        d.setStatus(v.getStatus() == null ? VendorStatus.APPROVED : v.getStatus());
+        d.setStatusReason(v.getStatusReason());
+        d.setSelfRegistered(Boolean.TRUE.equals(v.getSelfRegistered()));
         d.setActive(v.isActive());
         d.setCreatedAt(v.getCreatedAt());
         return d;

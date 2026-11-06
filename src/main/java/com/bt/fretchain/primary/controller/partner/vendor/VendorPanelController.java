@@ -40,6 +40,11 @@ public class VendorPanelController extends _BaseController {
         return ok(null, "password.changed");
     }
 
+    @PostMapping("/partner/api/vendor-profile/resubmit")
+    public ResponseEntity<ResponseData> resubmit() {
+        return ok(vendorService.resubmit(getLoggedInUser()), "store.resubmitted");
+    }
+
     // ---- vehicles
     @PostMapping("/partner/api/vendor-vehicle/list")
     public ResponseEntity<ResponseData> vehicles(@RequestBody VehicleDTO.ListOrSearchData req) {

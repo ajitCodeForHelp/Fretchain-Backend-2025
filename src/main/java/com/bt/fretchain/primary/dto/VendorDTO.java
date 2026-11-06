@@ -4,6 +4,8 @@ import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import com.bt.fretchain.primary.pojo.enums.VendorStatus;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -76,6 +78,34 @@ public class VendorDTO {
         private String password;
     }
 
+    /** Public sign-up: company details + login. The vendor starts PENDING until the admin approves. */
+    @Getter
+    @Setter
+    public static class Register extends Profile {
+        @NotBlank
+        @Email
+        @Size(max = 128)
+        private String loginEmail;
+
+        @Size(max = 15)
+        private String loginMobile;
+
+        @NotBlank
+        @Size(min = 6, max = 60)
+        private String password;
+    }
+
+    @Getter
+    @Setter
+    public static class ApprovalUpdate {
+        @NotNull
+        private VendorStatus status;
+
+        /** Required when rejecting or suspending. */
+        @Size(max = 500)
+        private String reason;
+    }
+
     @Getter
     @Setter
     public static class Detail {
@@ -102,6 +132,9 @@ public class VendorDTO {
         private LocalDateTime lastLogin;
         private Long vehicleCount;
         private Long driverCount;
+        private VendorStatus status;
+        private String statusReason;
+        private Boolean selfRegistered;
         private Boolean active;
         private LocalDateTime createdAt;
     }
@@ -112,6 +145,8 @@ public class VendorDTO {
     public static class Session {
         private String vendorUuid;
         private String userUuid;
+        private VendorStatus status;
+        private String statusReason;
         private String companyName;
         private String logoUrl;
         private Long vehicleCount;
@@ -151,5 +186,6 @@ public class VendorDTO {
     public static class FilterData {
         private Boolean active;
         private String city;
+        private VendorStatus status;
     }
 }
