@@ -261,6 +261,9 @@ public class StoreOrderDTO {
         /** One status, or null for all. */
         private StoreOrderStatus status;
 
+        /** Several statuses (a tab such as "In progress"). Used when no single status is given. */
+        private List<StoreOrderStatus> statuses;
+
         /** true = orders in progress. Used when no single status is given. */
         private Boolean active;
 

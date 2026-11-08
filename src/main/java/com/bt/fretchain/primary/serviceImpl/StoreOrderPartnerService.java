@@ -43,6 +43,8 @@ public class StoreOrderPartnerService {
             p.add(cb.equal(root.get(field(type)).get("recordId"), storeId));
             if (req.getStatus() != null) {
                 p.add(cb.equal(root.get("status"), req.getStatus()));
+            } else if (req.getStatuses() != null && !req.getStatuses().isEmpty()) {
+                p.add(root.get("status").in(req.getStatuses()));
             } else if (req.getActive() != null) {
                 Predicate active = root.get("status").in(StoreOrderStatus.ACTIVE);
                 p.add(req.getActive() ? active : cb.not(active));
@@ -58,7 +60,8 @@ public class StoreOrderPartnerService {
             return cb.and(p.toArray(new Predicate[0]));
         };
         // oldest first for orders in progress (first come, first served), newest first otherwise
-        boolean fifo = Boolean.TRUE.equals(req.getActive()) && req.getStatus() == null;
+        boolean fifo = req.getStatus() == null && (Boolean.TRUE.equals(req.getActive())
+                || (req.getStatuses() != null && req.getStatuses().stream().anyMatch(StoreOrderStatus::isActive)));
         Sort sort = Sort.by(fifo ? Sort.Direction.ASC : Sort.Direction.DESC, "createdAt");
         return PaginationUtils.createResponse(orderRepository.findAll(spec,
                 PageRequest.of(req.getPageNumber(), req.getPageSize(), sort)).map(orderService::toCard));
