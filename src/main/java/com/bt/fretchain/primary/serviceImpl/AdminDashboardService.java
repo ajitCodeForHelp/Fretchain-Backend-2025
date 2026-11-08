@@ -170,6 +170,8 @@ public class AdminDashboardService {
     }
 
     static String tone(String status) {
+        if (status.equals("REJECTED")) return "danger";
+        if (status.equals("PREPARING") || status.equals("READY") || status.equals("OUT_FOR_DELIVERY") || status.equals("ACCEPTED")) return "info";
         if (status.startsWith("CANCELLED")) return "danger";
         if (status.equals("DELIVERED")) return "success";
         if (status.equals("PLACED") || status.equals("DRIVER_REQUESTED")) return "warning";

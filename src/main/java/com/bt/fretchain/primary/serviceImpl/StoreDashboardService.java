@@ -81,9 +81,33 @@ public class StoreDashboardService {
         boolean food = restaurant;
 
         Section attention = r.section("attention");
+        Section orders = r.section("orders");
         Section catalogue = r.section("catalogue");
         Section team = r.section("team");
         Section profile = r.section("profile");
+
+        if (can.test("ORDER_VIEW")) {
+            String ow = " from StoreOrder o where o.deleted = false and o." + f + ".uuid = ?1";
+            String ordersLink = "/" + route + "Order";
+            attention.add(alert("newOrders", q.count("select count(o)" + ow + " and o.status = ?2",
+                    storeUuid, com.bt.fretchain.primary.pojo.enums.StoreOrderStatus.PLACED), "danger", ordersLink));
+            orders.add(stat("activeOrders", q.count("select count(o)" + ow + " and o.status in ?2", storeUuid,
+                    com.bt.fretchain.primary.pojo.enums.StoreOrderStatus.ACTIVE), "NUMBER", "active", "orange", ordersLink));
+            orders.add(stat("ordersToday", q.count("select count(o)" + ow + " and o.createdAt >= ?2", storeUuid, DashboardQuery.startOfToday()),
+                    "NUMBER", "today", "indigo", ordersLink));
+            orders.add(stat("salesToday", q.sum("select sum(o.totalAmount)" + ow + " and o.status = ?2 and o.createdAt >= ?3", storeUuid,
+                    com.bt.fretchain.primary.pojo.enums.StoreOrderStatus.DELIVERED, DashboardQuery.startOfToday()), "MONEY", "money", "green", ordersLink));
+            orders.add(stat("deliveredOrders", q.count("select count(o)" + ow + " and o.status = ?2", storeUuid,
+                    com.bt.fretchain.primary.pojo.enums.StoreOrderStatus.DELIVERED), "NUMBER", "delivered", "green", ordersLink));
+            orders.add(trend("ordersTrend", q.daily("select function('date', o.createdAt), count(o) from StoreOrder o where o.deleted = false and o." + f
+                    + ".uuid = ?2 and o.createdAt >= ?1 group by function('date', o.createdAt)", 14, storeUuid), "NUMBER").size("lg"));
+            List<Map<String, Object>> recentOrders = new ArrayList<>();
+            for (Object[] o : q.rows("select o.orderNumber, o.contactName, o.status, o.totalAmount, o.uuid" + ow + " order by o.createdAt desc", 6, storeUuid)) {
+                recentOrders.add(row(String.valueOf(o[0]), String.valueOf(o[1]), String.valueOf(o[2]),
+                        AdminDashboardService.tone(String.valueOf(o[2])), o[3], ordersLink + "/" + o[4]));
+            }
+            orders.add(list("recentOrders", recentOrders, ordersLink));
+        }
 
         if (can.test("ITEM_VIEW")) {
             long total = q.count("select count(i) from " + items + " i" + where, storeUuid);

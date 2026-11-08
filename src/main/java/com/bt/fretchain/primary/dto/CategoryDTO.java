@@ -26,6 +26,9 @@ public class CategoryDTO {
 
         private String imageUrl;
 
+        /** What orders in this category are: freight types, SHOP or FOOD (blank keeps / defaults to CONTAINER). */
+        private FreightOrderType orderType;
+
     }
 
     @Getter

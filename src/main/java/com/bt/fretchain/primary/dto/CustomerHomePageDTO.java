@@ -44,6 +44,9 @@ public class CustomerHomePageDTO {
 
         private String imageUrl;
 
+        /** CONTAINER, BREAK_BULK, PARCEL, BULK_MATERIAL (freight) or SHOP / FOOD (store orders). */
+        private com.bt.fretchain.primary.pojo.enums.FreightOrderType orderType;
+
         private List<SubCategoryResponse> subCategories;
     }
 

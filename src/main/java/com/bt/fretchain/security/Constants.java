@@ -31,6 +31,9 @@ public class Constants {
             "/actuator/**",
             "/customer/api/auth/**",
             "/customer/api/home/**",
+            // guests can browse shops / restaurants; ordering (/customer/api/store-order/**) needs a login
+            "/customer/api/shop/**",
+            "/customer/api/restaurant/**",
             "/admin/api/auth/**",
             "/driver/api/auth/**"
     };

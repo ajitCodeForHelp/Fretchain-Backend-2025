@@ -24,6 +24,11 @@ public class CouponUsage extends BaseEntity {
     @JoinColumn(name = "freight_order_id")
     private FreightOrder freightOrder;
 
+    /** Set when the coupon was used on a shop / food order. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "store_order_id")
+    private StoreOrder storeOrder;
+
     @Column(name = "discount_amount", precision = 12, scale = 2)
     private BigDecimal discountAmount;
 }

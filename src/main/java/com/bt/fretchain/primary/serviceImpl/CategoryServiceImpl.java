@@ -39,6 +39,10 @@ public class CategoryServiceImpl implements CategoryService {
         validateDuplicate(request);
 
         Category entity = categoryMapper.toEntity(request);
+        if (entity.getOrderType() == null) {
+            // the column is mandatory: new categories are freight CONTAINER unless the admin picks SHOP / FOOD ...
+            entity.setOrderType(com.bt.fretchain.primary.pojo.enums.FreightOrderType.CONTAINER);
+        }
 
         entity.setCreatedBy(user.getRecordId());
         entity.setModifiedBy(user.getRecordId());
@@ -63,7 +67,11 @@ public class CategoryServiceImpl implements CategoryService {
 
         validateDuplicateForUpdate(request, entity);
 
+        com.bt.fretchain.primary.pojo.enums.FreightOrderType keepType = entity.getOrderType();
         categoryMapper.updateEntityFromDto(request, entity);
+        if (entity.getOrderType() == null) {
+            entity.setOrderType(keepType);      // not sent: keep the current type
+        }
 
         entity.setModifiedBy(user.getRecordId());
 

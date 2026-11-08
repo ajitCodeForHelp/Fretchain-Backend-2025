@@ -31,6 +31,10 @@ public enum ShopActivity {
     ITEM_EDIT("ITEM", Action.EDIT),
     ITEM_STATUS("ITEM", Action.STATUS),
 
+    // customer orders: VIEW = see orders, STATUS = accept / reject / move them along
+    ORDER_VIEW("ORDER", Action.VIEW),
+    ORDER_STATUS("ORDER", Action.STATUS),
+
     ROLE_VIEW("ROLE", Action.VIEW),
     ROLE_ADD("ROLE", Action.ADD),
     ROLE_EDIT("ROLE", Action.EDIT),

@@ -13,6 +13,10 @@ public interface ShopItemRepository
 
     Optional<ShopItem> findByUuidAndDeletedFalse(String uuid);
 
+    /** Row lock: stock is checked and reduced while placing an order. */
+    @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    Optional<ShopItem> findWithLockByUuidAndDeletedFalse(String uuid);
+
     @Query("""
         SELECT i FROM ShopItem i
         WHERE i.shop.uuid = :shopUuid
