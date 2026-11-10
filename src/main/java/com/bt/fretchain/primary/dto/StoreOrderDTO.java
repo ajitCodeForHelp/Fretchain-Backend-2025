@@ -279,6 +279,14 @@ public class StoreOrderDTO {
         private Integer pageSize = 20;
     }
 
+    /** Admin: orders of all shops and restaurants, optionally of one type or one store. */
+    @Getter
+    @Setter
+    public static class AdminListRequest extends PartnerListRequest {
+        private StoreType storeType;
+        private String storeUuid;
+    }
+
     @Getter
     @Setter
     public static class StatusUpdate {

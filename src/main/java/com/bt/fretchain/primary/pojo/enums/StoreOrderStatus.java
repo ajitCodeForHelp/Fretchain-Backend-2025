@@ -35,6 +35,16 @@ public enum StoreOrderStatus {
         };
     }
 
+    /** Statuses a platform admin can move this order to: the store's steps, plus cancelling an order in progress. */
+    public Set<StoreOrderStatus> nextForAdmin() {
+        Set<StoreOrderStatus> next = EnumSet.noneOf(StoreOrderStatus.class);
+        next.addAll(nextForStore());
+        if (isActive()) {
+            next.add(CANCELLED);
+        }
+        return next;
+    }
+
     public boolean isActive() {
         return ACTIVE.contains(this);
     }

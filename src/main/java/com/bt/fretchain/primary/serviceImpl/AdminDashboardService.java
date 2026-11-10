@@ -63,6 +63,10 @@ public class AdminDashboardService {
             attention.add(alert("expiredLicenses", q.count("select count(d) from Driver d where d.deleted = false and d.active = true and d.licenseExpiryDate < current_date"), "danger", "/driver"));
         }
         if (can.contains(PlatformActivity.ORDER_VIEW)) {
+            attention.add(alert("newShopOrders", q.count("select count(o) from StoreOrder o where o.deleted = false and o.storeType = ?1 and o.status = ?2",
+                    com.bt.fretchain.primary.pojo.enums.StoreType.SHOP, com.bt.fretchain.primary.pojo.enums.StoreOrderStatus.PLACED), "warning", "/adminShopOrder"));
+            attention.add(alert("newRestaurantOrders", q.count("select count(o) from StoreOrder o where o.deleted = false and o.storeType = ?1 and o.status = ?2",
+                    com.bt.fretchain.primary.pojo.enums.StoreType.RESTAURANT, com.bt.fretchain.primary.pojo.enums.StoreOrderStatus.PLACED), "warning", "/adminRestaurantOrder"));
             attention.add(alert("ordersWaitingDriver", q.count("select count(o) from FreightOrder o where o.deleted = false and o.orderStatus in ?1",
                     List.of(OrderStatus.PLACED, OrderStatus.DRIVER_REQUESTED)), "warning", "/orders"));
         }

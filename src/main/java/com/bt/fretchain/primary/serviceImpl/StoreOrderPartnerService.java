@@ -67,6 +67,96 @@ public class StoreOrderPartnerService {
                 PageRequest.of(req.getPageNumber(), req.getPageSize(), sort)).map(orderService::toCard));
     }
 
+    // ================================================================ platform admin (all stores)
+
+    @Transactional(readOnly = true)
+    public DataTableResponsePacket<Card> adminList(AdminListRequest req) {
+        Specification<StoreOrder> spec = (root, query, cb) -> {
+            List<Predicate> p = new ArrayList<>();
+            p.add(cb.isFalse(root.get("deleted")));
+            if (req.getStoreType() != null) {
+                p.add(cb.equal(root.get("storeType"), req.getStoreType()));
+            }
+            if (req.getStoreUuid() != null && !req.getStoreUuid().isBlank()) {
+                p.add(cb.or(
+                        cb.equal(root.join("shop", jakarta.persistence.criteria.JoinType.LEFT).get("uuid"), req.getStoreUuid()),
+                        cb.equal(root.join("restaurant", jakarta.persistence.criteria.JoinType.LEFT).get("uuid"), req.getStoreUuid())));
+            }
+            if (req.getStatus() != null) {
+                p.add(cb.equal(root.get("status"), req.getStatus()));
+            } else if (req.getStatuses() != null && !req.getStatuses().isEmpty()) {
+                p.add(root.get("status").in(req.getStatuses()));
+            } else if (req.getActive() != null) {
+                Predicate active = root.get("status").in(StoreOrderStatus.ACTIVE);
+                p.add(req.getActive() ? active : cb.not(active));
+            }
+            String pattern = SearchUtils.containsPattern(req.getSearch());
+            if (pattern != null) {
+                char esc = SearchUtils.LIKE_ESCAPE;
+                p.add(cb.or(
+                        cb.like(cb.lower(root.get("orderNumber")), pattern, esc),
+                        cb.like(cb.lower(root.get("contactName")), pattern, esc),
+                        cb.like(cb.lower(root.get("contactMobile")), pattern, esc),
+                        cb.like(cb.lower(root.get("storeName")), pattern, esc)));
+            }
+            return cb.and(p.toArray(new Predicate[0]));
+        };
+        boolean fifo = req.getStatus() == null && (Boolean.TRUE.equals(req.getActive())
+                || (req.getStatuses() != null && req.getStatuses().stream().anyMatch(StoreOrderStatus::isActive)));
+        Sort sort = Sort.by(fifo ? Sort.Direction.ASC : Sort.Direction.DESC, "createdAt");
+        return PaginationUtils.createResponse(orderRepository.findAll(spec,
+                PageRequest.of(req.getPageNumber(), req.getPageSize(), sort)).map(orderService::toCard));
+    }
+
+    @Transactional(readOnly = true)
+    public Detail adminDetail(String uuid, boolean canChangeStatus) {
+        StoreOrder o = orderRepository.findByUuidAndDeletedFalse(uuid)
+                .orElseThrow(() -> new ResourceNotFoundException("record.notfound"));
+        Detail d = orderService.toDetail(o);
+        d.setCancellable(false);
+        d.setNextStatuses(canChangeStatus ? new ArrayList<>(o.getStatus().nextForAdmin()) : new ArrayList<>());
+        return d;
+    }
+
+    /** Admin override: the same steps as the store, plus cancelling (reason required; stock and coupon go back). */
+    @Transactional
+    public Detail adminUpdateStatus(String uuid, StatusUpdate req, SystemUser actor) {
+        StoreOrder o = orderRepository.findByUuidAndDeletedFalse(uuid)
+                .orElseThrow(() -> new ResourceNotFoundException("record.notfound"));
+        StoreOrderStatus next = req.getStatus();
+        if (!o.getStatus().nextForAdmin().contains(next)) {
+            throw new BadRequestException("storeorder.status.invalid");
+        }
+        applyStatus(o, next, req.getReason(), actor.getRecordId(), "Admin: " + actor.getFullName());
+        orderRepository.save(o);
+        Detail d = orderService.toDetail(o);
+        d.setCancellable(false);
+        d.setNextStatuses(new ArrayList<>(next.nextForAdmin()));
+        return d;
+    }
+
+    @Transactional(readOnly = true)
+    public Summary adminSummary(StoreType type) {
+        Summary s = new Summary();
+        for (StoreOrderStatus st : StoreOrderStatus.values()) {
+            s.getCounts().put(st.name(), 0L);
+        }
+        String where = " where o.deleted = false" + (type == null ? "" : " and o.storeType = ?1");
+        Object[] p = type == null ? new Object[0] : new Object[]{type};
+        for (Object[] r : q.rows("select o.status, count(o) from StoreOrder o" + where + " group by o.status", 0, p)) {
+            s.getCounts().put(String.valueOf(r[0]), ((Number) r[1]).longValue());
+        }
+        s.setActiveOrders(StoreOrderStatus.ACTIVE.stream().mapToLong(st -> s.getCounts().get(st.name())).sum());
+        Object[] p2 = type == null ? new Object[]{DashboardQuery.startOfToday()} : new Object[]{type, DashboardQuery.startOfToday()};
+        String today = type == null ? " and o.createdAt >= ?1" : " and o.createdAt >= ?2";
+        s.setOrdersToday(q.count("select count(o) from StoreOrder o" + where + today, p2));
+        Object[] p3 = type == null ? new Object[]{StoreOrderStatus.DELIVERED, DashboardQuery.startOfToday()}
+                : new Object[]{type, StoreOrderStatus.DELIVERED, DashboardQuery.startOfToday()};
+        String sales = type == null ? " and o.status = ?1 and o.createdAt >= ?2" : " and o.status = ?2 and o.createdAt >= ?3";
+        s.setSalesToday(q.sum("select sum(o.totalAmount) from StoreOrder o" + where + sales, p3));
+        return s;
+    }
+
     @Transactional(readOnly = true)
     public Detail detail(StoreType type, Long storeId, String uuid, boolean canChangeStatus) {
         StoreOrder o = find(type, storeId, uuid);
@@ -83,19 +173,7 @@ public class StoreOrderPartnerService {
         if (!o.getStatus().nextForStore().contains(next)) {
             throw new BadRequestException("storeorder.status.invalid");
         }
-        if (next == StoreOrderStatus.REJECTED && (req.getReason() == null || req.getReason().isBlank())) {
-            throw new BadRequestException("approval.reason.required");
-        }
-        o.setStatus(next);
-        o.setStatusReason(next == StoreOrderStatus.REJECTED ? req.getReason().trim() : o.getStatusReason());
-        o.setModifiedBy(actor.getRecordId());
-        orderService.log(o, next, next == StoreOrderStatus.REJECTED ? req.getReason().trim() : null, actor.getFullName());
-        if (next == StoreOrderStatus.REJECTED) {
-            orderService.releaseOrder(o);       // stock and coupon go back
-        }
-        if (next == StoreOrderStatus.DELIVERED) {
-            o.setPaymentPaid(true);             // cash collected on delivery
-        }
+        applyStatus(o, next, req.getReason(), actor.getRecordId(), actor.getFullName());
         orderRepository.save(o);
         Detail d = orderService.toDetail(o);
         d.setCancellable(false);
@@ -122,6 +200,26 @@ public class StoreOrderPartnerService {
                 + ".recordId = ?1 and o.status = ?2 and o.createdAt >= ?3", storeId, StoreOrderStatus.DELIVERED, DashboardQuery.startOfToday());
         s.setSalesToday(sales);
         return s;
+    }
+
+    /** Moves the order to `next`: reason for reject / cancel, stock and coupon released, cash marked paid on delivery. */
+    private void applyStatus(StoreOrder o, StoreOrderStatus next, String reason, Long actorId, String actorName) {
+        boolean stops = next == StoreOrderStatus.REJECTED || next == StoreOrderStatus.CANCELLED;
+        if (stops && (reason == null || reason.isBlank())) {
+            throw new BadRequestException("approval.reason.required");
+        }
+        o.setStatus(next);
+        if (stops) {
+            o.setStatusReason(reason.trim());
+        }
+        o.setModifiedBy(actorId);
+        orderService.log(o, next, stops ? reason.trim() : null, actorName);
+        if (stops) {
+            orderService.releaseOrder(o);       // stock and coupon go back
+        }
+        if (next == StoreOrderStatus.DELIVERED) {
+            o.setPaymentPaid(true);             // cash collected on delivery
+        }
     }
 
     private StoreOrder find(StoreType type, Long storeId, String uuid) {
