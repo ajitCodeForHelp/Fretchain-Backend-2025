@@ -89,6 +89,8 @@ public class DriverAuthDTO {
 
         private Boolean onlineStatus;
 
+        private java.math.BigDecimal rating;
+
         private String vehicleUuid;
 
         private String vehicleNumber;

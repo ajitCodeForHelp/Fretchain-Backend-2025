@@ -315,6 +315,10 @@ public class DriverAuthServiceImpl
                 driver.getOnlineStatus()
         );
 
+        response.setRating(
+                driver.getOverallRating()
+        );
+
 
         /*
          * Vehicle information
