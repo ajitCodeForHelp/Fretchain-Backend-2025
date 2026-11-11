@@ -101,6 +101,14 @@ public class StoreOrder extends BaseEntity {
     @Column(name = "payment_paid")
     private Boolean paymentPaid = false;
 
+    /** Driver who delivers the order (assigned by the admin, or automatically in AUTO dispatch mode). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "driver_id")
+    private Driver driver;
+
+    @Column(name = "driver_assigned_at")
+    private java.time.LocalDateTime driverAssignedAt;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<StoreOrderItem> items = new ArrayList<>();
 

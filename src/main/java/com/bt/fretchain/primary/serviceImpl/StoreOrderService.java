@@ -412,6 +412,7 @@ public class StoreOrderService {
 
     /** Gives back shop stock and the coupon use of an order that will not be delivered. */
     void releaseOrder(StoreOrder o) {
+        releaseDriver(o);
         for (StoreOrderItem item : o.getItems()) {
             if (o.getStoreType() == StoreType.SHOP && item.getItemUuid() != null) {
                 shopItemRepository.findWithLockByUuidAndDeletedFalse(item.getItemUuid()).ifPresent(si -> {
@@ -430,6 +431,22 @@ public class StoreOrderService {
     }
 
     // ================================================================ mapping (shared with the store side)
+
+    /** Delivered: the driver stays on the order (history) and can take new orders again. */
+    void freeDriver(StoreOrder o) {
+        if (o.getDriver() != null) {
+            o.getDriver().setAvailable(true);
+        }
+    }
+
+    /** The driver becomes available for other orders again. */
+    void releaseDriver(StoreOrder o) {
+        if (o.getDriver() != null) {
+            o.getDriver().setAvailable(true);
+            o.setDriver(null);
+            o.setDriverAssignedAt(null);
+        }
+    }
 
     void log(StoreOrder o, StoreOrderStatus status, String note, String by) {
         StoreOrderStatusLog l = new StoreOrderStatusLog();
@@ -456,6 +473,10 @@ public class StoreOrderService {
         c.setCustomerName(o.getContactName());
         c.setContactMobile(o.getContactMobile());
         c.setCreatedAt(o.getCreatedAt());
+        if (o.getDriver() != null) {
+            c.setDriverName(o.getDriver().getFullName());
+            c.setDriverMobile((o.getDriver().getCountryCode() == null ? "" : o.getDriver().getCountryCode()) + o.getDriver().getMobile());
+        }
         return c;
     }
 
@@ -505,6 +526,13 @@ public class StoreOrderService {
             d.getTimeline().add(t);
         }
         d.setCancellable(o.getStatus() == StoreOrderStatus.PLACED);
+        if (o.getDriver() != null) {
+            d.setDriverName(o.getDriver().getFullName());
+            d.setDriverMobile((o.getDriver().getCountryCode() == null ? "" : o.getDriver().getCountryCode()) + o.getDriver().getMobile());
+            d.setDriverVehicle(o.getDriver().getVehicle() == null ? null : o.getDriver().getVehicle().getVehicleNumber());
+            d.setDriverAssignedAt(o.getDriverAssignedAt());
+        }
+        d.setCanAssignDriver(false);
         return d;
     }
 

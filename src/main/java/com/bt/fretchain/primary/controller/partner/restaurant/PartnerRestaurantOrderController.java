@@ -26,7 +26,7 @@ public class PartnerRestaurantOrderController extends _BaseController {
     @PostMapping("/list")
     public ResponseEntity<ResponseData> list(@Valid @RequestBody StoreOrderDTO.PartnerListRequest request) {
         RestaurantStaff staff = access.require(getLoggedInUser(), RestaurantActivity.ORDER_VIEW);
-        return ok(service.list(StoreType.RESTAURANT, staff.getRestaurant().getRecordId(), request), "record.list.fetched");
+        return ok(service.list(StoreType.RESTAURANT, staff.getRestaurant().getRecordId(), request, access.has(staff, RestaurantActivity.ORDER_STATUS)), "record.list.fetched");
     }
 
     @GetMapping("/summary")

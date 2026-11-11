@@ -209,6 +209,13 @@ public class StoreOrderDTO {
         private String customerName;
         private String contactMobile;
         private LocalDateTime createdAt;
+        /** Driver delivering the order (null until assigned). */
+        private String driverName;
+        private String driverMobile;
+        /** Buttons the logged-in staff member may use on this row (empty without ORDER_STATUS). */
+        private List<StoreOrderStatus> nextStatuses = new ArrayList<>();
+        /** Admin: a driver can be assigned or changed now. */
+        private Boolean canAssignDriver = false;
     }
 
     @Getter
@@ -244,6 +251,13 @@ public class StoreOrderDTO {
         private Double distanceKm;
         private LocalDateTime createdAt;
         private List<TimelineEntry> timeline = new ArrayList<>();
+
+        private String driverName;
+        private String driverMobile;
+        private String driverVehicle;
+        private LocalDateTime driverAssignedAt;
+        /** Admin: a driver can be assigned or changed now. */
+        private Boolean canAssignDriver = false;
 
         /** Customer: true while the order can still be cancelled. */
         private Boolean cancellable;
@@ -285,6 +299,13 @@ public class StoreOrderDTO {
     public static class AdminListRequest extends PartnerListRequest {
         private StoreType storeType;
         private String storeUuid;
+    }
+
+    @Getter
+    @Setter
+    public static class AssignDriver {
+        /** Driver to assign; empty removes the current driver. */
+        private String driverUuid;
     }
 
     @Getter

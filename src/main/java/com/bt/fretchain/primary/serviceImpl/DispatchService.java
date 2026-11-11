@@ -138,7 +138,7 @@ public class DispatchService {
     }
 
     /** First failing check for a driver and service, or null when the driver is ready. */
-    private String blockingReason(Driver d, DeliveryService service) {
+    public String blockingReason(Driver d, DeliveryService service) {
         if (!d.isActive()) return "INACTIVE";
         if (!Boolean.TRUE.equals(d.getVerified())) return "NOT_VERIFIED";
         Vehicle v = d.getVehicle();

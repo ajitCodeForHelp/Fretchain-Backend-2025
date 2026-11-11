@@ -26,7 +26,7 @@ public class StoreOrderAdminController extends _BaseController {
 
     @PostMapping("/list")
     public ResponseEntity<ResponseData> list(@Valid @RequestBody StoreOrderDTO.AdminListRequest request) {
-        return ok(service.adminList(request), "record.list.fetched");
+        return ok(service.adminList(request, access.has(getLoggedInUser(), PlatformActivity.ORDER_STATUS)), "record.list.fetched");
     }
 
     @GetMapping("/summary")
@@ -43,6 +43,24 @@ public class StoreOrderAdminController extends _BaseController {
     @PatchMapping("/{uuid}/status")
     public ResponseEntity<ResponseData> status(@PathVariable String uuid, @Valid @RequestBody StoreOrderDTO.StatusUpdate request) {
         return ok(service.adminUpdateStatus(uuid, request, getLoggedInUser()), "status.updated");
+    }
+
+    /** Ready drivers around the store, nearest first. */
+    @GetMapping("/{uuid}/drivers")
+    public ResponseEntity<ResponseData> drivers(@PathVariable String uuid, @RequestParam(required = false) Double radiusKm) {
+        return ok(service.adminDriverCandidates(uuid, radiusKm), "record.fetched");
+    }
+
+    /** Assign (or, with an empty driverUuid, remove) the delivery driver. */
+    @PatchMapping("/{uuid}/driver")
+    public ResponseEntity<ResponseData> assign(@PathVariable String uuid, @RequestBody StoreOrderDTO.AssignDriver request) {
+        return ok(service.adminAssignDriver(uuid, request.getDriverUuid(), getLoggedInUser()), "status.updated");
+    }
+
+    /** Assign the nearest ready driver. */
+    @PatchMapping("/{uuid}/driver/auto")
+    public ResponseEntity<ResponseData> autoAssign(@PathVariable String uuid) {
+        return ok(service.adminAutoAssign(uuid, getLoggedInUser()), "status.updated");
     }
 
     private ResponseEntity<ResponseData> ok(Object data, String message) {

@@ -4,7 +4,12 @@ import com.bt.fretchain.bean.DataTableResponsePacket;
 import com.bt.fretchain.exception.BadRequestException;
 import com.bt.fretchain.exception.ResourceNotFoundException;
 import com.bt.fretchain.primary.dto.StoreOrderDTO.*;
+import com.bt.fretchain.primary.dto.DispatchDTO;
+import com.bt.fretchain.primary.pojo.Driver;
 import com.bt.fretchain.primary.pojo.StoreOrder;
+import com.bt.fretchain.primary.pojo.enums.AssignmentMode;
+import com.bt.fretchain.primary.pojo.enums.DeliveryService;
+import com.bt.fretchain.primary.repository.DriverRepository;
 import com.bt.fretchain.primary.pojo.SystemUser;
 import com.bt.fretchain.primary.pojo.enums.StoreOrderStatus;
 import com.bt.fretchain.primary.pojo.enums.StoreType;
@@ -34,9 +39,11 @@ public class StoreOrderPartnerService {
     private final StoreOrderRepository orderRepository;
     private final StoreOrderService orderService;
     private final DashboardQuery q;
+    private final DispatchService dispatch;
+    private final DriverRepository driverRepository;
 
     @Transactional(readOnly = true)
-    public DataTableResponsePacket<Card> list(StoreType type, Long storeId, PartnerListRequest req) {
+    public DataTableResponsePacket<Card> list(StoreType type, Long storeId, PartnerListRequest req, boolean canChangeStatus) {
         Specification<StoreOrder> spec = (root, query, cb) -> {
             List<Predicate> p = new ArrayList<>();
             p.add(cb.isFalse(root.get("deleted")));
@@ -64,13 +71,29 @@ public class StoreOrderPartnerService {
                 || (req.getStatuses() != null && req.getStatuses().stream().anyMatch(StoreOrderStatus::isActive)));
         Sort sort = Sort.by(fifo ? Sort.Direction.ASC : Sort.Direction.DESC, "createdAt");
         return PaginationUtils.createResponse(orderRepository.findAll(spec,
-                PageRequest.of(req.getPageNumber(), req.getPageSize(), sort)).map(orderService::toCard));
+                PageRequest.of(req.getPageNumber(), req.getPageSize(), sort))
+                .map(o -> rowCard(o, canChangeStatus, false)));
+    }
+
+    /** List row with the buttons the viewer may use (store: its own steps; admin: also cancel and driver). */
+    private Card rowCard(StoreOrder o, boolean canChange, boolean admin) {
+        Card c = orderService.toCard(o);
+        if (canChange) {
+            c.setNextStatuses(new ArrayList<>(admin ? o.getStatus().nextForAdmin() : o.getStatus().nextForStore()));
+            c.setCanAssignDriver(admin && canAssign(o));
+        }
+        return c;
+    }
+
+    private static boolean canAssign(StoreOrder o) {
+        return o.getStatus() == StoreOrderStatus.ACCEPTED || o.getStatus() == StoreOrderStatus.PREPARING
+                || o.getStatus() == StoreOrderStatus.READY;
     }
 
     // ================================================================ platform admin (all stores)
 
     @Transactional(readOnly = true)
-    public DataTableResponsePacket<Card> adminList(AdminListRequest req) {
+    public DataTableResponsePacket<Card> adminList(AdminListRequest req, boolean canChangeStatus) {
         Specification<StoreOrder> spec = (root, query, cb) -> {
             List<Predicate> p = new ArrayList<>();
             p.add(cb.isFalse(root.get("deleted")));
@@ -105,7 +128,8 @@ public class StoreOrderPartnerService {
                 || (req.getStatuses() != null && req.getStatuses().stream().anyMatch(StoreOrderStatus::isActive)));
         Sort sort = Sort.by(fifo ? Sort.Direction.ASC : Sort.Direction.DESC, "createdAt");
         return PaginationUtils.createResponse(orderRepository.findAll(spec,
-                PageRequest.of(req.getPageNumber(), req.getPageSize(), sort)).map(orderService::toCard));
+                PageRequest.of(req.getPageNumber(), req.getPageSize(), sort))
+                .map(o -> rowCard(o, canChangeStatus, true)));
     }
 
     @Transactional(readOnly = true)
@@ -115,7 +139,95 @@ public class StoreOrderPartnerService {
         Detail d = orderService.toDetail(o);
         d.setCancellable(false);
         d.setNextStatuses(canChangeStatus ? new ArrayList<>(o.getStatus().nextForAdmin()) : new ArrayList<>());
+        d.setCanAssignDriver(canChangeStatus && canAssign(o));
         return d;
+    }
+
+    // ---------------------------------------------------------------- driver assignment
+
+    /** Ready drivers around the store, nearest first (manual assignment list). */
+    @Transactional(readOnly = true)
+    public List<DispatchDTO.Candidate> adminDriverCandidates(String uuid, Double radiusKm) {
+        StoreOrder o = findAny(uuid);
+        double[] at = storeLocation(o);
+        return dispatch.candidates(serviceOf(o), at[0], at[1], radiusKm, 30);
+    }
+
+    @Transactional
+    public Detail adminAssignDriver(String uuid, String driverUuid, SystemUser actor) {
+        StoreOrder o = findAny(uuid);
+        if (!canAssign(o)) {
+            throw new BadRequestException("storeorder.driver.notnow");
+        }
+        if (driverUuid == null || driverUuid.isBlank()) {
+            orderService.releaseDriver(o);
+            orderService.log(o, o.getStatus(), "Driver removed", "Admin: " + actor.getFullName());
+        } else {
+            Driver d = driverRepository.findByUuidAndDeletedFalse(driverUuid)
+                    .orElseThrow(() -> new ResourceNotFoundException("record.notfound"));
+            if (o.getDriver() != null && o.getDriver().getRecordId().equals(d.getRecordId())) {
+                throw new BadRequestException("storeorder.driver.same");
+            }
+            if (dispatch.blockingReason(d, serviceOf(o)) != null) {
+                throw new BadRequestException("storeorder.driver.notready");
+            }
+            assign(o, d, "Admin: " + actor.getFullName());
+        }
+        o.setModifiedBy(actor.getRecordId());
+        orderRepository.save(o);
+        return adminDetail(uuid, true);
+    }
+
+    /** The nearest ready driver, as AUTO mode would pick. */
+    @Transactional
+    public Detail adminAutoAssign(String uuid, SystemUser actor) {
+        StoreOrder o = findAny(uuid);
+        if (!canAssign(o)) {
+            throw new BadRequestException("storeorder.driver.notnow");
+        }
+        if (!autoAssign(o, "Admin: " + actor.getFullName())) {
+            throw new BadRequestException("storeorder.driver.none");
+        }
+        orderRepository.save(o);
+        return adminDetail(uuid, true);
+    }
+
+    private void assign(StoreOrder o, Driver d, String by) {
+        orderService.releaseDriver(o);          // a driver changed: the old one is free again
+        d.setAvailable(false);
+        o.setDriver(d);
+        o.setDriverAssignedAt(java.time.LocalDateTime.now());
+        orderService.log(o, o.getStatus(), "Driver assigned: " + d.getFullName(), by);
+    }
+
+    /** Picks the nearest ready driver around the store. Returns false when nobody is available. */
+    private boolean autoAssign(StoreOrder o, String by) {
+        double[] at = storeLocation(o);
+        var pick = dispatch.pick(serviceOf(o), at[0], at[1]);
+        if (pick.isEmpty()) {
+            return false;
+        }
+        Driver d = driverRepository.findByUuidAndDeletedFalse(pick.get().getDriverUuid()).orElse(null);
+        if (d == null) {
+            return false;
+        }
+        assign(o, d, by);
+        return true;
+    }
+
+    private static DeliveryService serviceOf(StoreOrder o) {
+        return o.getStoreType() == StoreType.SHOP ? DeliveryService.SHOP_DELIVERY : DeliveryService.FOOD_DELIVERY;
+    }
+
+    private static double[] storeLocation(StoreOrder o) {
+        var lat = o.getStoreType() == StoreType.SHOP ? o.getShop().getLatitude() : o.getRestaurant().getLatitude();
+        var lng = o.getStoreType() == StoreType.SHOP ? o.getShop().getLongitude() : o.getRestaurant().getLongitude();
+        return new double[]{lat.doubleValue(), lng.doubleValue()};
+    }
+
+    private StoreOrder findAny(String uuid) {
+        return orderRepository.findByUuidAndDeletedFalse(uuid)
+                .orElseThrow(() -> new ResourceNotFoundException("record.notfound"));
     }
 
     /** Admin override: the same steps as the store, plus cancelling (reason required; stock and coupon go back). */
@@ -219,6 +331,12 @@ public class StoreOrderPartnerService {
         }
         if (next == StoreOrderStatus.DELIVERED) {
             o.setPaymentPaid(true);             // cash collected on delivery
+            orderService.freeDriver(o);
+        }
+        // AUTO dispatch: when the store accepts, the nearest ready driver is assigned (admin can still change it)
+        if (next == StoreOrderStatus.ACCEPTED && o.getDriver() == null
+                && dispatch.settings().getMode() == AssignmentMode.AUTO) {
+            autoAssign(o, "Auto dispatch");
         }
     }
 

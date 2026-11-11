@@ -26,7 +26,7 @@ public class PartnerShopOrderController extends _BaseController {
     @PostMapping("/list")
     public ResponseEntity<ResponseData> list(@Valid @RequestBody StoreOrderDTO.PartnerListRequest request) {
         ShopStaff staff = access.require(getLoggedInUser(), ShopActivity.ORDER_VIEW);
-        return ok(service.list(StoreType.SHOP, staff.getShop().getRecordId(), request), "record.list.fetched");
+        return ok(service.list(StoreType.SHOP, staff.getShop().getRecordId(), request, access.has(staff, ShopActivity.ORDER_STATUS)), "record.list.fetched");
     }
 
     @GetMapping("/summary")
