@@ -84,6 +84,21 @@ public class Driver extends BaseEntity  {
     @Column(name = "device_token", length = 1000)
     private String deviceToken;
 
+    @Column(name = "device_id", length = 120)
+    private String deviceId;
+
+    @Column(name = "device_platform", length = 20)
+    private String devicePlatform; // android | ios
+
+    @Column(name = "device_model", length = 120)
+    private String deviceModel;
+
+    @Column(name = "app_version", length = 40)
+    private String appVersion;
+
+    @Column(name = "device_updated_at")
+    private LocalDateTime deviceUpdatedAt;
+
     @Column(name = "current_latitude")
     private Double currentLat;
 

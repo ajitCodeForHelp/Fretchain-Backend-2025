@@ -32,7 +32,8 @@ public class DriverAuthServiceImpl
     @Override
     public DriverAuthDTO.AuthResponse loginDriver(
             String userName,
-            String password
+            String password,
+            DriverAuthDTO.DeviceInfo device
     ) {
 
         Driver driver = findDriver(userName);
@@ -44,14 +45,94 @@ public class DriverAuthServiceImpl
          */
         driver.setLastLogin(LocalDateTime.now());
 
-        //TODO
         /*
-         * Update FCM Device Details for Notifications
+         * FCM device + location details, so new orders can be pushed to this phone
          */
+        applyDevice(driver, device);
 
         driverRepository.save(driver);
 
         return generateAuthResponse(driver);
+    }
+
+    @Override
+    public DriverAuthDTO.AuthResponse profile(Driver driver) {
+        DriverAuthDTO.AuthResponse response = generateAuthResponse(driver);
+        response.setToken(null);
+        return response;
+    }
+
+    @Override
+    public void updateDevice(Driver driver, DriverAuthDTO.DeviceInfo device) {
+        applyDevice(driver, device);
+        driverRepository.save(driver);
+    }
+
+    @Override
+    public void updateLocation(Driver driver, Double latitude, Double longitude) {
+        setLocation(driver, latitude, longitude);
+        driverRepository.save(driver);
+    }
+
+    @Override
+    public DriverAuthDTO.AuthResponse setOnline(Driver driver, boolean online, Double latitude, Double longitude) {
+        driver.setOnlineStatus(online);
+        if (online) {
+            setLocation(driver, latitude, longitude);
+        }
+        driverRepository.save(driver);
+        DriverAuthDTO.AuthResponse response = generateAuthResponse(driver);
+        response.setToken(null);
+        return response;
+    }
+
+    @Override
+    public void logout(Driver driver) {
+        driver.setDeviceToken(null);
+        driver.setOnlineStatus(false);
+        driverRepository.save(driver);
+    }
+
+    private void applyDevice(Driver driver, DriverAuthDTO.DeviceInfo device) {
+        if (device == null) {
+            return;
+        }
+        String token = device.getFcmToken() == null ? null : device.getFcmToken().trim();
+        if (token != null && !token.isEmpty()) {
+            /*
+             * A phone belongs to one driver at a time: if someone else logged in on it earlier,
+             * stop pushing their orders to this phone.
+             */
+            driverRepository.findAll((root, q, cb) -> cb.and(
+                    cb.equal(root.get("deviceToken"), token),
+                    cb.notEqual(root.get("uuid"), driver.getUuid())
+            )).forEach(other -> {
+                other.setDeviceToken(null);
+                driverRepository.save(other);
+            });
+            driver.setDeviceToken(token);
+        }
+        if (device.getDeviceId() != null) driver.setDeviceId(cut(device.getDeviceId(), 120));
+        if (device.getPlatform() != null) driver.setDevicePlatform(cut(device.getPlatform().toLowerCase(), 20));
+        if (device.getDeviceModel() != null) driver.setDeviceModel(cut(device.getDeviceModel(), 120));
+        if (device.getAppVersion() != null) driver.setAppVersion(cut(device.getAppVersion(), 40));
+        driver.setDeviceUpdatedAt(LocalDateTime.now());
+        setLocation(driver, device.getLatitude(), device.getLongitude());
+    }
+
+    private void setLocation(Driver driver, Double lat, Double lng) {
+        if (lat == null || lng == null
+                || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+            return;
+        }
+        driver.setCurrentLat(lat);
+        driver.setCurrentLng(lng);
+        driver.setLastLocationUpdatedAt(LocalDateTime.now());
+    }
+
+    private static String cut(String v, int max) {
+        String t = v.trim();
+        return t.length() > max ? t.substring(0, max) : t;
     }
 
 
