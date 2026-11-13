@@ -63,6 +63,20 @@ public class Driver extends BaseEntity  {
     @Column(name = "verified")
     private Boolean verified = false;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "verification_status", length = 20)
+    private com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus verificationStatus;
+
+    /** Why the account was rejected (shown to the driver / fleet owner). */
+    @Column(name = "verification_reason", length = 500)
+    private String verificationReason;
+
+    @Column(name = "verification_changed_at")
+    private LocalDateTime verificationChangedAt;
+
+    @Column(name = "verification_reviewer", length = 120)
+    private String verificationReviewer;
+
     @Column(name = "available")
     private Boolean available = true;
 
@@ -125,4 +139,26 @@ public class Driver extends BaseEntity  {
             fetch = FetchType.LAZY
     )
     private DriverDocument driverDocument;
+
+    /** PENDING / VERIFIED / REJECTED; older rows without a stored status are derived from "verified". */
+    public com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus getVerificationStatus() {
+        if (verificationStatus != null) {
+            return verificationStatus;
+        }
+        return Boolean.TRUE.equals(verified)
+                ? com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.VERIFIED
+                : com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.PENDING;
+    }
+
+    /** Keeps the boolean flag (used by dispatch and login) in step with the review status. */
+    public void review(com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus status, String reason, String reviewer) {
+        this.verificationStatus = status;
+        this.verified = status == com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.VERIFIED;
+        this.verificationReason = status == com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.REJECTED ? reason : null;
+        this.verificationChangedAt = LocalDateTime.now();
+        this.verificationReviewer = reviewer;
+        if (status != com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.VERIFIED) {
+            this.onlineStatus = false;
+        }
+    }
 }

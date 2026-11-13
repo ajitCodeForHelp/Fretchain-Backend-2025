@@ -108,7 +108,17 @@ public class VendorFleetService {
         String vendor = writeVendorUuid(user);
         ownDriver(vendor, uuid);
         req.setVendorUuid(vendor);
-        return driverService.update(uuid, req, user);
+        DriverDTO.Detail updated = driverService.update(uuid, req, user);
+        // a corrected rejected driver goes back for a new review
+        driverService.resubmitIfRejected(uuid);
+        return driverService.getById(uuid);
+    }
+
+    @Transactional
+    public DriverDTO.Detail reviewDriver(SystemUser user, String uuid, DriverDTO.Review req) {
+        String vendor = writeVendorUuid(user);
+        ownDriver(vendor, uuid);
+        return driverService.review(uuid, req.getStatus(), req.getReason(), user);
     }
 
     @Transactional

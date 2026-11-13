@@ -198,9 +198,18 @@ public class DriverAuthServiceImpl
 
 
         /*
-         * Driver must be verified
+         * Driver must be verified: pending drivers wait, rejected drivers are told why
          */
         if (!Boolean.TRUE.equals(driver.getVerified())) {
+
+            if (driver.getVerificationStatus()
+                    == com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.REJECTED) {
+                String why = driver.getVerificationReason();
+                throw new BadRequestException(
+                        "Your account was rejected"
+                                + (why == null || why.isBlank() ? "." : ": " + why)
+                                + " Please contact your fleet owner or Fretchain support.");
+            }
 
             throw new BadRequestException(
                     "driver.not.verified"
@@ -306,6 +315,9 @@ public class DriverAuthServiceImpl
         response.setVerified(
                 driver.getVerified()
         );
+
+        response.setVerificationStatus(driver.getVerificationStatus().name());
+        response.setVerificationReason(driver.getVerificationReason());
 
         response.setAvailable(
                 driver.getAvailable()

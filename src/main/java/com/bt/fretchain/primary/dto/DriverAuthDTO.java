@@ -85,6 +85,10 @@ public class DriverAuthDTO {
 
         private Boolean verified;
 
+        private String verificationStatus;
+
+        private String verificationReason;
+
         private Boolean available;
 
         private Boolean onlineStatus;

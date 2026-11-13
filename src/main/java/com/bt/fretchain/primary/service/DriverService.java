@@ -22,6 +22,12 @@ public interface DriverService {
 
     void updateVerification(String uuid, Boolean verified, SystemUser user);
 
+    /** Approve / reject (reason required) / back to pending. Returns the updated driver. */
+    DriverDTO.Detail review(String uuid, com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus status, String reason, SystemUser user);
+
+    /** A fleet owner corrected a rejected driver: it goes back to PENDING for a new review. */
+    void resubmitIfRejected(String uuid);
+
     DriverDTO.Detail update(
             String uuid,
             DriverDTO.SaveOrUpdate request,

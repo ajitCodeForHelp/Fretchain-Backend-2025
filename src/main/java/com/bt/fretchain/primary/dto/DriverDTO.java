@@ -82,6 +82,14 @@ public class DriverDTO {
 
         private Boolean verified;
 
+        private com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus verificationStatus;
+
+        private String verificationReason;
+
+        private LocalDateTime verificationChangedAt;
+
+        private String verificationReviewer;
+
         private Boolean available;
 
         private Boolean onlineStatus;
@@ -150,6 +158,9 @@ public class DriverDTO {
 
         private Boolean verified;
 
+        /** PENDING / VERIFIED / REJECTED */
+        private com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus verificationStatus;
+
         private Boolean available;
 
         /** Legacy name of vehicleUuid. */
@@ -167,5 +178,17 @@ public class DriverDTO {
         private String field;
 
         private String direction;
+    }
+
+    /** Approve / reject (reason required) / send back to pending. */
+    @Getter
+    @Setter
+    public static class Review {
+
+        @jakarta.validation.constraints.NotNull(message = "Status is required")
+        private com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus status;
+
+        @jakarta.validation.constraints.Size(max = 500, message = "Reason is too long")
+        private String reason;
     }
 }

@@ -114,6 +114,17 @@ public class DriverController extends _BaseController {
                 .statusCode(200).message("status.updated").build());
     }
 
+    /** Approve / reject (reason required) a driver, or send it back to pending (needs DRIVER_STATUS). */
+    @PatchMapping("/{uuid}/review")
+    public ResponseEntity<ResponseData> review(
+            @PathVariable String uuid,
+            @Valid @RequestBody DriverDTO.Review req
+    ) {
+        return ResponseEntity.ok(ResponseData.builder()
+                .statusCode(200).message("status.updated")
+                .data(driverService.review(uuid, req.getStatus(), req.getReason(), getLoggedInUser())).build());
+    }
+
     @GetMapping("/list-in-key-value")
     public ResponseEntity<ResponseData> listInKeyValue(
             @RequestParam(required = false) String vendorUuid

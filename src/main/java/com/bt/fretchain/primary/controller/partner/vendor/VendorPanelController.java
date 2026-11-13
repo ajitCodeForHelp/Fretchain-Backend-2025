@@ -115,6 +115,12 @@ public class VendorPanelController extends _BaseController {
         return ok(null, "status.updated");
     }
 
+    /** The fleet owner approves / rejects (reason required) one of their own drivers. */
+    @PatchMapping("/partner/api/vendor-driver/{uuid}/review")
+    public ResponseEntity<ResponseData> reviewDriver(@PathVariable String uuid, @Valid @RequestBody DriverDTO.Review req) {
+        return ok(fleet.reviewDriver(getLoggedInUser(), uuid, req), "status.updated");
+    }
+
     private ResponseEntity<ResponseData> ok(Object data, String message) {
         return ResponseEntity.ok(ResponseData.builder().statusCode(200).message(message).data(data).build());
     }

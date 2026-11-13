@@ -61,9 +61,45 @@ public class DriverServiceImpl implements DriverService {
         Driver entity = driverRepository
                 .findByUuidAndDeletedFalse(uuid)
                 .orElseThrow(() -> new ResourceNotFoundException("record.notfound"));
-        entity.setVerified(Boolean.TRUE.equals(verified));
+        entity.review(Boolean.TRUE.equals(verified)
+                        ? com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.VERIFIED
+                        : com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.PENDING,
+                null, reviewerName(user));
         entity.setModifiedBy(actorId(user));
         driverRepository.save(entity);
+    }
+
+    @Override
+    public DriverDTO.Detail review(String uuid, com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus status,
+                                   String reason, SystemUser user) {
+        Driver entity = driverRepository
+                .findByUuidAndDeletedFalse(uuid)
+                .orElseThrow(() -> new ResourceNotFoundException("record.notfound"));
+        if (status == null) {
+            throw new com.bt.fretchain.exception.BadRequestException("driver.review.status.required");
+        }
+        String why = reason == null ? null : reason.trim();
+        if (status == com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.REJECTED && (why == null || why.isEmpty())) {
+            throw new com.bt.fretchain.exception.BadRequestException("driver.review.reason.required");
+        }
+        entity.review(status, why, reviewerName(user));
+        entity.setModifiedBy(actorId(user));
+        driverRepository.save(entity);
+        return driverMapper.toDetailDto(entity);
+    }
+
+    @Override
+    public void resubmitIfRejected(String uuid) {
+        driverRepository.findByUuidAndDeletedFalse(uuid).ifPresent(d -> {
+            if (d.getVerificationStatus() == com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.REJECTED) {
+                d.review(com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.PENDING, null, null);
+                driverRepository.save(d);
+            }
+        });
+    }
+
+    private static String reviewerName(SystemUser user) {
+        return user == null ? null : user.getFullName();
     }
 
     /** user is null for public sign-ups. */
@@ -90,7 +126,10 @@ public class DriverServiceImpl implements DriverService {
                 request.getPassword()
         );
 
-        entity.setVerified(verified);
+        entity.review(verified
+                        ? com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.VERIFIED
+                        : com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.PENDING,
+                null, verified ? reviewerName(user) : null);
         entity.setCreatedBy(actorId(user));
         entity.setModifiedBy(actorId(user));
 
@@ -503,6 +542,20 @@ public class DriverServiceImpl implements DriverService {
                                     request.getFilters().getVerified()
                             )
                     );
+                }
+
+                if (request.getFilters().getVerificationStatus() != null) {
+                    var st = request.getFilters().getVerificationStatus();
+                    if (st == com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.REJECTED) {
+                        predicates.add(cb.equal(root.get("verificationStatus"), st));
+                    } else if (st == com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.VERIFIED) {
+                        predicates.add(cb.equal(root.get("verified"), true));
+                    } else {
+                        // pending = not verified and not rejected (older rows have no stored status)
+                        predicates.add(cb.equal(root.get("verified"), false));
+                        predicates.add(cb.or(cb.isNull(root.get("verificationStatus")),
+                                cb.equal(root.get("verificationStatus"), st)));
+                    }
                 }
 
                 if (request.getFilters().getAvailable() != null) {
