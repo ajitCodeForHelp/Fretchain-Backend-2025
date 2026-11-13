@@ -38,6 +38,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class StoreOrderService {
 
+    private final OfferService offers;
     private final StoreOrderRepository orderRepository;
     private final ShopMasterRepository shopRepository;
     private final RestaurantMasterRepository restaurantRepository;
@@ -412,6 +413,7 @@ public class StoreOrderService {
 
     /** Gives back shop stock and the coupon use of an order that will not be delivered. */
     void releaseOrder(StoreOrder o) {
+        offers.cancelOpen(o, "Order ended");
         releaseDriver(o);
         for (StoreOrderItem item : o.getItems()) {
             if (o.getStoreType() == StoreType.SHOP && item.getItemUuid() != null) {

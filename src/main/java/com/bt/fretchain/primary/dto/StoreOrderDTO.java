@@ -212,6 +212,11 @@ public class StoreOrderDTO {
         /** Driver delivering the order (null until assigned). */
         private String driverName;
         private String driverMobile;
+        /** A driver has been asked but has not answered yet (waiting on this driver until offerExpiresAt). */
+        private String offerDriverName;
+        private LocalDateTime offerExpiresAt;
+        /** AUTO | MANUAL */
+        private String offerMode;
         /** Buttons the logged-in staff member may use on this row (empty without ORDER_STATUS). */
         private List<StoreOrderStatus> nextStatuses = new ArrayList<>();
         /** Admin: a driver can be assigned or changed now. */
@@ -254,6 +259,11 @@ public class StoreOrderDTO {
 
         private String driverName;
         private String driverMobile;
+        /** A driver has been asked but has not answered yet (waiting on this driver until offerExpiresAt). */
+        private String offerDriverName;
+        private LocalDateTime offerExpiresAt;
+        /** AUTO | MANUAL */
+        private String offerMode;
         private String driverVehicle;
         private LocalDateTime driverAssignedAt;
         /** Admin: a driver can be assigned or changed now. */

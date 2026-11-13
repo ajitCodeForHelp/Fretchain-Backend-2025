@@ -96,6 +96,13 @@ public class AdminFreightOrderController extends _BaseController {
         );
     }
 
+    /** AUTO: ask the nearest matching drivers now (needs ORDER_STATUS). */
+    @PatchMapping("/{orderUuid}/auto-dispatch")
+    public ResponseEntity<ResponseData> autoDispatch(@PathVariable String orderUuid) {
+        int asked = adminFreightOrderService.autoDispatch(orderUuid, getLoggedInUser());
+        return ResponseEntity.ok(ResponseData.builder().statusCode(200).message("status.updated").data(asked).build());
+    }
+
     @PostMapping("/{orderUuid}/assign-driver")
     public ResponseEntity<ResponseData> assignDriver(
             @PathVariable String orderUuid,

@@ -41,6 +41,7 @@ public class StoreOrderPartnerService {
     private final DashboardQuery q;
     private final DispatchService dispatch;
     private final DriverRepository driverRepository;
+    private final OfferService offers;
 
     @Transactional(readOnly = true)
     public DataTableResponsePacket<Card> list(StoreType type, Long storeId, PartnerListRequest req, boolean canChangeStatus) {
@@ -81,6 +82,12 @@ public class StoreOrderPartnerService {
         if (canChange) {
             c.setNextStatuses(new ArrayList<>(admin ? o.getStatus().nextForAdmin() : o.getStatus().nextForStore()));
             c.setCanAssignDriver(admin && canAssign(o));
+        }
+        var offer = offers.currentOffer(o);
+        if (offer != null && o.getDriver() == null) {
+            c.setOfferDriverName(offer.getDriver().getFullName());
+            c.setOfferExpiresAt(offer.getExpiresAt());
+            c.setOfferMode(offer.getOfferMode());
         }
         return c;
     }
@@ -140,6 +147,12 @@ public class StoreOrderPartnerService {
         d.setCancellable(false);
         d.setNextStatuses(canChangeStatus ? new ArrayList<>(o.getStatus().nextForAdmin()) : new ArrayList<>());
         d.setCanAssignDriver(canChangeStatus && canAssign(o));
+        var offer = offers.currentOffer(o);
+        if (offer != null && o.getDriver() == null) {
+            d.setOfferDriverName(offer.getDriver().getFullName());
+            d.setOfferExpiresAt(offer.getExpiresAt());
+            d.setOfferMode(offer.getOfferMode());
+        }
         return d;
     }
 
@@ -160,6 +173,7 @@ public class StoreOrderPartnerService {
             throw new BadRequestException("storeorder.driver.notnow");
         }
         if (driverUuid == null || driverUuid.isBlank()) {
+            offers.cancelOpen(o, "Removed by staff");
             orderService.releaseDriver(o);
             orderService.log(o, o.getStatus(), "Driver removed", "Admin: " + actor.getFullName());
         } else {
@@ -171,7 +185,9 @@ public class StoreOrderPartnerService {
             if (dispatch.blockingReason(d, serviceOf(o)) != null) {
                 throw new BadRequestException("storeorder.driver.notready");
             }
-            assign(o, d, "Admin: " + actor.getFullName());
+            // the chosen driver gets an offer and must accept; a previous driver (if any) is released
+            orderService.releaseDriver(o);
+            offers.offerManual(o, d, "Admin: " + actor.getFullName(), actor.getRecordId());
         }
         o.setModifiedBy(actor.getRecordId());
         orderRepository.save(o);
@@ -185,34 +201,13 @@ public class StoreOrderPartnerService {
         if (!canAssign(o)) {
             throw new BadRequestException("storeorder.driver.notnow");
         }
-        if (!autoAssign(o, "Admin: " + actor.getFullName())) {
+        offers.cancelOpen(o, "Re-dispatched");
+        orderService.releaseDriver(o);
+        if (offers.dispatchNext(o, true) == 0) {
             throw new BadRequestException("storeorder.driver.none");
         }
         orderRepository.save(o);
         return adminDetail(uuid, true);
-    }
-
-    private void assign(StoreOrder o, Driver d, String by) {
-        orderService.releaseDriver(o);          // a driver changed: the old one is free again
-        d.setAvailable(false);
-        o.setDriver(d);
-        o.setDriverAssignedAt(java.time.LocalDateTime.now());
-        orderService.log(o, o.getStatus(), "Driver assigned: " + d.getFullName(), by);
-    }
-
-    /** Picks the nearest ready driver around the store. Returns false when nobody is available. */
-    private boolean autoAssign(StoreOrder o, String by) {
-        double[] at = storeLocation(o);
-        var pick = dispatch.pick(serviceOf(o), at[0], at[1]);
-        if (pick.isEmpty()) {
-            return false;
-        }
-        Driver d = driverRepository.findByUuidAndDeletedFalse(pick.get().getDriverUuid()).orElse(null);
-        if (d == null) {
-            return false;
-        }
-        assign(o, d, by);
-        return true;
     }
 
     private static DeliveryService serviceOf(StoreOrder o) {
@@ -334,9 +329,9 @@ public class StoreOrderPartnerService {
             orderService.freeDriver(o);
         }
         // AUTO dispatch: when the store accepts, the nearest ready driver is assigned (admin can still change it)
-        if (next == StoreOrderStatus.ACCEPTED && o.getDriver() == null
-                && dispatch.settings().getMode() == AssignmentMode.AUTO) {
-            autoAssign(o, "Auto dispatch");
+        if ((next == StoreOrderStatus.ACCEPTED || next == StoreOrderStatus.PREPARING || next == StoreOrderStatus.READY)
+                && o.getDriver() == null && dispatch.settings().getMode() == AssignmentMode.AUTO) {
+            offers.dispatchNext(o);   // no-op while an offer is open; retries at each step if nobody was available
         }
     }
 

@@ -23,6 +23,28 @@ public class DispatchDTO {
         @DecimalMin("0.5")
         @DecimalMax("100.0")
         private Double radiusKm;
+
+        // ---- freight orders and offer timing (optional on update: missing = keep the current value)
+        private AssignmentMode freightMode;
+
+        @DecimalMin("1.0")
+        @DecimalMax("500.0")
+        private Double freightRadiusKm;
+
+        /** Seconds a driver has to answer a shop / food offer. */
+        @jakarta.validation.constraints.Min(10)
+        @jakarta.validation.constraints.Max(300)
+        private Integer storeOfferSeconds;
+
+        /** Seconds drivers have to answer a freight offer. */
+        @jakarta.validation.constraints.Min(30)
+        @jakarta.validation.constraints.Max(1800)
+        private Integer freightOfferSeconds;
+
+        /** Nearest drivers asked at the same time for a freight order. */
+        @jakarta.validation.constraints.Min(1)
+        @jakarta.validation.constraints.Max(10)
+        private Integer freightWaveSize;
     }
 
     @Getter

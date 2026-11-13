@@ -51,6 +51,11 @@ public class DispatchService {
         DispatchDTO.Settings d = new DispatchDTO.Settings();
         d.setMode(s.getStoreAssignmentMode() == null ? AssignmentMode.MANUAL : s.getStoreAssignmentMode());
         d.setRadiusKm(s.getStoreAssignmentRadiusKm() == null ? 5.0 : s.getStoreAssignmentRadiusKm());
+        d.setFreightMode(s.getFreightAssignmentMode() == null ? AssignmentMode.MANUAL : s.getFreightAssignmentMode());
+        d.setFreightRadiusKm(s.getFreightAssignmentRadiusKm() == null ? 30.0 : s.getFreightAssignmentRadiusKm());
+        d.setStoreOfferSeconds(s.getStoreOfferSeconds() == null ? 30 : s.getStoreOfferSeconds());
+        d.setFreightOfferSeconds(s.getFreightOfferSeconds() == null ? 120 : s.getFreightOfferSeconds());
+        d.setFreightWaveSize(s.getFreightWaveSize() == null ? 3 : s.getFreightWaveSize());
         return d;
     }
 
@@ -59,6 +64,11 @@ public class DispatchService {
         PlatformSetting s = settingRepository.findTopByOrderByRecordIdAsc().orElse(new PlatformSetting());
         s.setStoreAssignmentMode(req.getMode());
         s.setStoreAssignmentRadiusKm(req.getRadiusKm());
+        if (req.getFreightMode() != null) s.setFreightAssignmentMode(req.getFreightMode());
+        if (req.getFreightRadiusKm() != null) s.setFreightAssignmentRadiusKm(req.getFreightRadiusKm());
+        if (req.getStoreOfferSeconds() != null) s.setStoreOfferSeconds(req.getStoreOfferSeconds());
+        if (req.getFreightOfferSeconds() != null) s.setFreightOfferSeconds(req.getFreightOfferSeconds());
+        if (req.getFreightWaveSize() != null) s.setFreightWaveSize(req.getFreightWaveSize());
         s.setModifiedBy(actor.getRecordId());
         settingRepository.save(s);
         return settings();
@@ -69,6 +79,12 @@ public class DispatchService {
     /** Eligible drivers around a point, nearest first. radiusKm null = the configured radius. */
     @Transactional(readOnly = true)
     public List<DispatchDTO.Candidate> candidates(DeliveryService service, double lat, double lng, Double radiusKm, int limit) {
+        return candidates(service, lat, lng, radiusKm, limit, null);
+    }
+
+    /** vendorUuid (login uuid of a fleet owner) limits the list to that fleet owner's drivers; null = everyone. */
+    @Transactional(readOnly = true)
+    public List<DispatchDTO.Candidate> candidates(DeliveryService service, double lat, double lng, Double radiusKm, int limit, String vendorUuid) {
         if (service == DeliveryService.FREIGHT) {
             // freight is matched by the customer's vehicle type (existing flow), not by this finder
             throw new BadRequestException("dispatch.service.invalid");
@@ -82,6 +98,9 @@ public class DispatchService {
             if (!v.getVehicleCategory().supports(service) || d.getCurrentLat() == null || d.getCurrentLng() == null) {
                 continue;
             }
+            if (vendorUuid != null && (d.getVendor() == null || !vendorUuid.equals(d.getVendor().getUuid()))) {
+                continue;
+            }
             if (d.getLastLocationUpdatedAt() != null && d.getLastLocationUpdatedAt().isBefore(fresh)) {
                 continue;
             }
@@ -92,6 +111,57 @@ public class DispatchService {
         }
         result.sort(Comparator.comparing(DispatchDTO.Candidate::getDistanceKm));
         return result.size() > limit ? result.subList(0, limit) : result;
+    }
+
+    /**
+     * Freight: ready drivers whose vehicle category is the one the customer picked, nearest to the pickup first.
+     * pickup coordinates missing = no distance filter (drivers are listed without a distance).
+     * excludeDriverIds: drivers who already rejected / let the offer expire.
+     */
+    @Transactional(readOnly = true)
+    public List<DispatchDTO.Candidate> freightCandidates(com.bt.fretchain.primary.pojo.FreightOrder order, Double radiusKm,
+                                                         int limit, String vendorUuid, Set<Long> excludeDriverIds) {
+        if (order.getVehicleCategory() == null) {
+            return List.of();
+        }
+        Double pLat = order.getPickupAddress() == null ? null : order.getPickupAddress().getLatitude();
+        Double pLng = order.getPickupAddress() == null ? null : order.getPickupAddress().getLongitude();
+        double radius = radiusKm != null ? radiusKm : settings().getFreightRadiusKm();
+        LocalDateTime fresh = LocalDateTime.now().minusMinutes(FRESH_LOCATION_MINUTES);
+        Long categoryId = order.getVehicleCategory().getRecordId();
+
+        List<DispatchDTO.Candidate> result = new ArrayList<>();
+        for (Driver d : readyDrivers()) {
+            Vehicle v = d.getVehicle();
+            if (!categoryId.equals(v.getVehicleCategory().getRecordId())) continue;
+            if (excludeDriverIds != null && excludeDriverIds.contains(d.getRecordId())) continue;
+            if (vendorUuid != null && (d.getVendor() == null || !vendorUuid.equals(d.getVendor().getUuid()))) continue;
+            Double km = null;
+            if (pLat != null && pLng != null) {
+                if (d.getCurrentLat() == null || d.getCurrentLng() == null) continue;
+                if (d.getLastLocationUpdatedAt() != null && d.getLastLocationUpdatedAt().isBefore(fresh)) continue;
+                km = distanceKm(pLat, pLng, d.getCurrentLat(), d.getCurrentLng());
+                if (km > radius) continue;
+            }
+            result.add(toCandidate(d, km == null ? null : km));
+        }
+        result.sort(Comparator.comparing(DispatchDTO.Candidate::getDistanceKm, Comparator.nullsLast(Comparator.naturalOrder())));
+        return result.size() > limit ? result.subList(0, limit) : result;
+    }
+
+    /** Same as {@link #candidates} but without the radius / service rules, for checking one chosen driver. */
+    public String freightBlockingReason(Driver d, com.bt.fretchain.primary.pojo.FreightOrder order) {
+        if (!d.isActive()) return "INACTIVE";
+        if (!Boolean.TRUE.equals(d.getVerified())) return "NOT_VERIFIED";
+        Vehicle v = d.getVehicle();
+        if (v == null || v.isDeleted()) return "NO_VEHICLE";
+        if (!v.isActive()) return "VEHICLE_INACTIVE";
+        if (!Boolean.TRUE.equals(v.getVerified())) return "VEHICLE_NOT_VERIFIED";
+        if (order.getVehicleCategory() == null || v.getVehicleCategory() == null
+                || !order.getVehicleCategory().getRecordId().equals(v.getVehicleCategory().getRecordId())) return "CATEGORY_MISMATCH";
+        if (!Boolean.TRUE.equals(d.getAvailable())) return "NOT_AVAILABLE";
+        if (!Boolean.TRUE.equals(d.getOnlineStatus())) return "OFFLINE";
+        return null;
     }
 
     /** What AUTO mode would assign: the nearest eligible driver, if any. */
@@ -168,7 +238,7 @@ public class DispatchService {
         return em.createQuery(jpql, Driver.class).getResultList();
     }
 
-    private DispatchDTO.Candidate toCandidate(Driver d, double km) {
+    private DispatchDTO.Candidate toCandidate(Driver d, Double km) {
         DispatchDTO.Candidate c = new DispatchDTO.Candidate();
         c.setDriverUuid(d.getUuid());
         c.setFullName(d.getFullName());
@@ -178,7 +248,7 @@ public class DispatchService {
         c.setVendorName(d.getVendor() == null ? null : d.getVendor().getFullName());
         c.setVehicleNumber(d.getVehicle().getVehicleNumber());
         c.setVehicleCategory(d.getVehicle().getVehicleCategory().getNameEn());
-        c.setDistanceKm(Math.round(km * 100.0) / 100.0);
+        c.setDistanceKm(km == null ? null : Math.round(km * 100.0) / 100.0);
         c.setRating(d.getOverallRating());
         c.setLastLocationUpdatedAt(d.getLastLocationUpdatedAt());
         return c;

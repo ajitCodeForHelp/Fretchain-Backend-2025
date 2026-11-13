@@ -56,6 +56,10 @@ public class AdminFreightOrderServiceImpl implements AdminFreightOrderService {
     private final OrderDriverAssignmentRepository orderDriverAssignmentRepository;
 
     private final DriverNotificationService driverNotificationService;
+
+    private final OfferService offers;
+
+    private final DispatchService dispatch;
     @Override
     @Transactional(readOnly = true)
     public DataTableResponsePacket<AdminFreightOrderDTO.ListResponse> getListData(
@@ -110,6 +114,7 @@ public class AdminFreightOrderServiceImpl implements AdminFreightOrderService {
         mapDocuments(order, response);
         mapOrderTypeDetail(order, response);
         mapStatusLogs(order, response);
+        mapDriverDetail(order, response);
 
         return response;
     }
@@ -136,6 +141,16 @@ public class AdminFreightOrderServiceImpl implements AdminFreightOrderService {
 
         order.setOrderStatus(status);
         order.setModifiedBy(user.getRecordId());
+
+        // order over: withdraw open offers and let the driver take new jobs
+        if (status == OrderStatus.DELIVERED || status == OrderStatus.CANCELLED_BY_ADMIN
+                || status == OrderStatus.CANCELLED_BY_CUSTOMER || status == OrderStatus.CANCELLED_BY_DRIVER) {
+            offers.cancelOpen(order, "Order ended");
+            if (order.getDriver() != null) {
+                order.getDriver().setAvailable(true);
+                driverRepository.save(order.getDriver());
+            }
+        }
 
         FreightOrder savedOrder =
                 freightOrderRepository.save(order);
@@ -190,7 +205,42 @@ public class AdminFreightOrderServiceImpl implements AdminFreightOrderService {
             response.setVehicleCategoryNameFr(order.getVehicleCategory().getNameFr());
         }
 
+        mapDriverList(order, response);
+
         return response;
+    }
+
+    private void mapDriverList(FreightOrder order, AdminFreightOrderDTO.ListResponse r) {
+        if (order.getDriver() != null) {
+            r.setDriverName(order.getDriver().getFullName());
+            r.setDriverMobile((order.getDriver().getCountryCode() == null ? "" : order.getDriver().getCountryCode()) + order.getDriver().getMobile());
+            r.setDriverVehicle(order.getDriver().getVehicle() == null ? null : order.getDriver().getVehicle().getVehicleNumber());
+        }
+        var open = orderDriverAssignmentRepository.findByFreightOrderRecordIdAndAssignmentStatusAndDeletedFalse(
+                order.getRecordId(), com.bt.fretchain.primary.pojo.enums.DriverAssignmentStatus.PENDING);
+        if (order.getDriver() == null && !open.isEmpty()) {
+            r.setOfferDriverName(open.size() == 1 ? open.get(0).getDriver().getFullName() : open.size() + " drivers");
+            r.setOfferExpiresAt(open.stream().map(o -> o.getExpiresAt()).filter(java.util.Objects::nonNull).max(java.util.Comparator.naturalOrder()).orElse(null));
+            r.setOfferMode(open.get(0).getOfferMode());
+        }
+        r.setCanAssignDriver(order.getDriver() == null && assignable(order));
+    }
+
+    private static boolean assignable(FreightOrder o) {
+        return o.getOrderStatus() == OrderStatus.PLACED || o.getOrderStatus() == OrderStatus.DRIVER_REQUESTED
+                || o.getOrderStatus() == OrderStatus.DRIVER_ASSIGNED;
+    }
+
+    private void mapDriverDetail(FreightOrder order, AdminFreightOrderDTO.DetailResponse r) {
+        AdminFreightOrderDTO.ListResponse tmp = new AdminFreightOrderDTO.ListResponse();
+        mapDriverList(order, tmp);
+        r.setDriverName(tmp.getDriverName());
+        r.setDriverMobile(tmp.getDriverMobile());
+        r.setDriverVehicle(tmp.getDriverVehicle());
+        r.setOfferDriverName(tmp.getOfferDriverName());
+        r.setOfferExpiresAt(tmp.getOfferExpiresAt());
+        r.setOfferMode(tmp.getOfferMode());
+        r.setCanAssignDriver(tmp.getCanAssignDriver());
     }
 
     private void mapCustomer(
@@ -724,11 +774,43 @@ public class AdminFreightOrderServiceImpl implements AdminFreightOrderService {
 
 //        validateOrderAccess(order, user);
 
-        return driverRepository.getAvailableDriversForOrder(
-                order.getRecordId()
-        );
+        return dispatch.freightCandidates(order, null, 50, null, null).stream()
+                .map(c -> AvailableDriverResponse.builder()
+                        .driverUuid(c.getDriverUuid())
+                        .fullName(c.getFullName())
+                        .mobile(c.getMobile())
+                        .countryCode(c.getCountryCode())
+                        .profileImageUrl(c.getProfileImageUrl())
+                        .vendorName(c.getVendorName())
+                        .overallRating(c.getRating())
+                        .distanceKm(c.getDistanceKm())
+                        .lastLocationUpdatedAt(c.getLastLocationUpdatedAt())
+                        .vehicleNumber(c.getVehicleNumber())
+                        .vehicleCategoryNameEn(c.getVehicleCategory())
+                        .verified(true).available(true).onlineStatus(true)
+                        .build())
+                .toList();
     }
 
+
+    @Override
+    @Transactional
+    public int autoDispatch(String orderUuid, SystemUser user) {
+        FreightOrder order = freightOrderRepository.findByUuidAndDeletedFalse(orderUuid)
+                .orElseThrow(() -> new ResourceNotFoundException("freight.order.not.found"));
+        if (order.getDriver() != null) {
+            throw new BadRequestException("freight.order.driver.already.assigned");
+        }
+        if (!assignable(order)) {
+            throw new BadRequestException("freight.order.cancelled");
+        }
+        offers.cancelOpen(order, "Re-dispatched");
+        int n = offers.dispatchNext(order, true);
+        if (n == 0) {
+            throw new BadRequestException("freight.driver.none");
+        }
+        return n;
+    }
 
     @Override
     @Transactional
@@ -824,66 +906,12 @@ public class AdminFreightOrderServiceImpl implements AdminFreightOrderService {
             );
         }
 
-        boolean pendingAssignmentExists =
-                orderDriverAssignmentRepository
-                        .existsByFreightOrderRecordIdAndAssignmentStatus(
-                                order.getRecordId(),
-                                DriverAssignmentStatus.PENDING
-                        );
-
-        if (pendingAssignmentExists) {
-
-            throw new BadRequestException(
-                    "driver.assignment.already.pending"
-            );
+        if (dispatch.freightBlockingReason(driver, order) != null) {
+            throw new BadRequestException("driver.not.available");
         }
-
-        OrderDriverAssignment assignment =
-                new OrderDriverAssignment();
-
-        assignment.setFreightOrder(order);
-
-        assignment.setDriver(driver);
-
-        assignment.setAssignmentStatus(
-                DriverAssignmentStatus.PENDING
-        );
-
-        assignment.setAssignedAt(
-                LocalDateTime.now()
-        );
-
-
-        assignment.setCreatedBy(
-                user.getRecordId()
-        );
-
-        assignment.setModifiedBy(
-                user.getRecordId()
-        );
-
 
         OrderDriverAssignment savedAssignment =
-                orderDriverAssignmentRepository.save(
-                        assignment
-                );
-
-        driverNotificationService.sendOrderAssignmentNotification(
-                savedAssignment
-        );
-
-        if (driver.getDeviceToken() == null
-                || driver.getDeviceToken().isBlank()) {
-            savedAssignment.setNotificationSent(true);
-
-            savedAssignment.setNotificationSentAt(
-                    LocalDateTime.now()
-            );
-
-            orderDriverAssignmentRepository.save(
-                    savedAssignment
-            );
-        }
+                offers.offerManual(order, driver, "Admin: " + user.getFullName(), user.getRecordId());
 
         return DriverAssignmentDTO.AssignResponse.builder()
 

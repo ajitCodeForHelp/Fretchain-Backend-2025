@@ -14,6 +14,10 @@ public class AvailableDriverResponse {
 
     private Long driverId;
 
+    private String driverUuid;
+
+    private String vendorName;
+
     private String fullName;
 
     private String mobile;

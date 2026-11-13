@@ -59,6 +59,10 @@ public class CustomerFreightOrderServiceImpl implements CustomerFreightOrderServ
 
     private final FreightOrderParcelDetailRepository parcelDetailRepository;
 
+    private final OfferService offers;
+
+    private final DispatchService dispatch;
+
     @Override
     public CustomerFreightOrderDTO.EstimateResponse estimate(
             CustomerFreightOrderDTO.EstimateRequest request
@@ -462,6 +466,11 @@ public class CustomerFreightOrderServiceImpl implements CustomerFreightOrderServ
                 OrderStatus.PLACED,
                 "Order placed by customer"
         );
+
+        // AUTO dispatch: ask the nearest drivers with the customer's vehicle type right away
+        if (dispatch.settings().getFreightMode() == com.bt.fretchain.primary.pojo.enums.AssignmentMode.AUTO) {
+            offers.dispatchNext(savedOrder);
+        }
 
         CustomerFreightOrderDTO.PlaceOrderResponse response =
                 new CustomerFreightOrderDTO.PlaceOrderResponse();

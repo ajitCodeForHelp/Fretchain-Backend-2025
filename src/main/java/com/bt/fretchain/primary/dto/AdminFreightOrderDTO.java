@@ -63,6 +63,24 @@ public class AdminFreightOrderDTO {
     @Setter
     public static class ListResponse {
 
+        // ---- driver / dispatch
+        private String driverName;
+
+        private String driverMobile;
+
+        private String driverVehicle;
+
+        /** A driver has been asked and has not answered yet (waiting until offerExpiresAt). */
+        private String offerDriverName;
+
+        private java.time.LocalDateTime offerExpiresAt;
+
+        /** AUTO | MANUAL */
+        private String offerMode;
+
+        /** Staff can offer / change the driver now. */
+        private Boolean canAssignDriver = false;
+
         private String orderUuid;
 
         private String orderNumber;
@@ -103,6 +121,24 @@ public class AdminFreightOrderDTO {
     @Getter
     @Setter
     public static class DetailResponse {
+
+        // ---- driver / dispatch
+        private String driverName;
+
+        private String driverMobile;
+
+        private String driverVehicle;
+
+        /** A driver has been asked and has not answered yet (waiting until offerExpiresAt). */
+        private String offerDriverName;
+
+        private java.time.LocalDateTime offerExpiresAt;
+
+        /** AUTO | MANUAL */
+        private String offerMode;
+
+        /** Staff can offer / change the driver now. */
+        private Boolean canAssignDriver = false;
 
         private String orderUuid;
 

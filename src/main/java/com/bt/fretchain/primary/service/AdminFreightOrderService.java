@@ -37,4 +37,7 @@ public interface AdminFreightOrderService {
             SystemUser user
     );
 
+
+    /** AUTO: offers the order to the nearest matching driver(s) now (withdraws offers still open). Returns how many were asked. */
+    int autoDispatch(String orderUuid, SystemUser user);
 }

@@ -29,12 +29,15 @@ import java.time.LocalDateTime;
 @Setter
 public class OrderDriverAssignment extends BaseEntity {
 
+    /** Set for freight offers (null for shop / food orders). */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(
-            name = "freight_order_id",
-            nullable = false
-    )
+    @JoinColumn(name = "freight_order_id")
     private FreightOrder freightOrder;
+
+    /** Set for shop / food offers (null for freight orders). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "store_order_id")
+    private StoreOrder storeOrder;
 
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -72,4 +75,25 @@ public class OrderDriverAssignment extends BaseEntity {
 
     @Column(name = "notification_sent_at")
     private LocalDateTime notificationSentAt;
+
+
+    /** The offer stops being valid at this time (the driver can no longer accept). */
+    @Column(name = "expires_at")
+    private LocalDateTime expiresAt;
+
+    /** AUTO (sent by the system) or MANUAL (picked by admin / fleet owner). */
+    @Column(name = "offer_mode", length = 10)
+    private String offerMode;
+
+    /** 1, 2, 3... which round of offers this belongs to (auto mode). */
+    @Column(name = "wave")
+    private Integer wave;
+
+    /** Driver's distance to the pickup when the offer was made. */
+    @Column(name = "distance_km")
+    private Double distanceKm;
+
+    public boolean isForStoreOrder() {
+        return storeOrder != null;
+    }
 }

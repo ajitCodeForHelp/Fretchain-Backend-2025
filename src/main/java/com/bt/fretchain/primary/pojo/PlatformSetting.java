@@ -72,4 +72,24 @@ public class PlatformSetting extends BaseEntity {
     /** Search radius around the store for shop / food deliveries. */
     @Column(name = "store_assignment_radius_km")
     private Double storeAssignmentRadiusKm = 5.0;
+
+    /** How freight orders get a driver: MANUAL (staff pick) or AUTO (offers go out by themselves). */
+    @jakarta.persistence.Enumerated(jakarta.persistence.EnumType.STRING)
+    @Column(name = "freight_assignment_mode", length = 10)
+    private com.bt.fretchain.primary.pojo.enums.AssignmentMode freightAssignmentMode;
+
+    @Column(name = "freight_assignment_radius_km")
+    private Double freightAssignmentRadiusKm;
+
+    /** Seconds a driver has to answer a shop / food offer (one driver at a time). */
+    @Column(name = "store_offer_seconds")
+    private Integer storeOfferSeconds;
+
+    /** Seconds drivers have to answer a freight offer (several drivers at once, first to accept wins). */
+    @Column(name = "freight_offer_seconds")
+    private Integer freightOfferSeconds;
+
+    /** How many nearest drivers get a freight offer at the same time. */
+    @Column(name = "freight_wave_size")
+    private Integer freightWaveSize;
 }
