@@ -253,6 +253,26 @@ public class OfferService {
                 .stream().map(this::view).collect(Collectors.toList());
     }
 
+    /** The orders this driver accepted and has not finished yet (newest first). */
+    @Transactional(readOnly = true)
+    public List<OfferDTO.View> currentFor(Driver driver) {
+        return offers.findByDriverRecordIdAndAssignmentStatusAndDeletedFalseOrderByRespondedAtDesc(driver.getRecordId(), DriverAssignmentStatus.ACCEPTED)
+                .stream()
+                .filter(a -> a.getFreightOrder() != null
+                        ? isLive(a.getFreightOrder()) && driver.getRecordId().equals(a.getFreightOrder().getDriver() == null ? null : a.getFreightOrder().getDriver().getRecordId())
+                        : isLive(a.getStoreOrder()) && a.getStoreOrder().getDriver() != null && driver.getRecordId().equals(a.getStoreOrder().getDriver().getRecordId()))
+                .map(this::view).collect(Collectors.toList());
+    }
+
+    private static boolean isLive(FreightOrder o) {
+        return o.getOrderStatus() != OrderStatus.DELIVERED && o.getOrderStatus() != OrderStatus.CANCELLED_BY_ADMIN
+                && o.getOrderStatus() != OrderStatus.CANCELLED_BY_CUSTOMER && o.getOrderStatus() != OrderStatus.CANCELLED_BY_DRIVER;
+    }
+
+    private static boolean isLive(StoreOrder o) {
+        return o.getStatus().isActive();
+    }
+
     // ================================================================ helpers
 
     private OrderDriverAssignment own(Driver driver, String uuid) {

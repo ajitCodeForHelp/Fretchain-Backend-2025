@@ -24,6 +24,12 @@ public class DriverOfferController {
         return ok(offers.pendingFor(userDetails.getLoggedInDriver()), "record.list.fetched");
     }
 
+    /** Orders this driver accepted and has not finished. */
+    @GetMapping("/current")
+    public ResponseEntity<ResponseData> current() {
+        return ok(offers.currentFor(userDetails.getLoggedInDriver()), "record.list.fetched");
+    }
+
     @PostMapping("/{uuid}/accept")
     public ResponseEntity<ResponseData> accept(@PathVariable String uuid) {
         return ok(offers.accept(userDetails.getLoggedInDriver(), uuid), "offer.accepted");
