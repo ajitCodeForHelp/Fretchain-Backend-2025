@@ -53,6 +53,7 @@ public class OfferService {
     @Transactional
     public OrderDriverAssignment offerManual(FreightOrder order, Driver driver, String by, Long actorId) {
         cancelOpen(order, "Replaced by a manual assignment");
+        requireNoOpenOffer(driver);
         OrderDriverAssignment a = create(order, null, driver, AssignmentMode.MANUAL, 1, null, actorId);
         freightLog(order, "Offered to " + driver.getFullName() + " (" + by + ")", null);
         send(a);
@@ -62,6 +63,7 @@ public class OfferService {
     @Transactional
     public OrderDriverAssignment offerManual(StoreOrder order, Driver driver, String by, Long actorId) {
         cancelOpen(order, "Replaced by a manual assignment");
+        requireNoOpenOffer(driver);
         OrderDriverAssignment a = create(null, order, driver, AssignmentMode.MANUAL, 1, null, actorId);
         storeLog(order, "Offered to " + driver.getFullName(), by);
         send(a);
@@ -281,6 +283,14 @@ public class OfferService {
             throw new ResourceNotFoundException("record.notfound");
         }
         return a;
+    }
+
+    /** One question at a time: a driver with an unanswered offer is not offered a second order. */
+    private void requireNoOpenOffer(Driver driver) {
+        if (offers.existsByDriverRecordIdAndAssignmentStatusAndExpiresAtAfterAndDeletedFalse(
+                driver.getRecordId(), DriverAssignmentStatus.PENDING, LocalDateTime.now())) {
+            throw new BadRequestException("offer.driver.has.open.offer");
+        }
     }
 
     private OrderDriverAssignment create(FreightOrder fo, StoreOrder so, Driver d, AssignmentMode mode, int wave, Double km, Long actor) {

@@ -225,8 +225,12 @@ public class DispatchService {
 
     /** Drivers passing every check except the service and the location (those depend on the order). */
     private List<Driver> readyDrivers() {
+        // a driver who has an offer waiting for an answer is not asked about another order at the same time
         return loadDrivers(" and d.active = true and d.verified = true and d.available = true and d.onlineStatus = true"
-                + " and v.deleted = false and v.active = true and v.verified = true");
+                + " and v.deleted = false and v.active = true and v.verified = true"
+                + " and d.recordId not in (select a.driver.recordId from OrderDriverAssignment a where a.deleted = false"
+                + " and a.assignmentStatus = com.bt.fretchain.primary.pojo.enums.DriverAssignmentStatus.PENDING"
+                + " and a.expiresAt > CURRENT_TIMESTAMP)");
     }
 
     private List<Driver> loadDrivers(String extra) {

@@ -51,4 +51,6 @@ public interface OrderDriverAssignmentRepository
     /** A driver's current job: accepted offers. */
     List<OrderDriverAssignment> findByDriverRecordIdAndAssignmentStatusAndDeletedFalseOrderByRespondedAtDesc(
             Long driverId, DriverAssignmentStatus status);
+
+    boolean existsByDriverRecordIdAndAssignmentStatusAndExpiresAtAfterAndDeletedFalse(Long driverId, DriverAssignmentStatus status, LocalDateTime now);
 }
