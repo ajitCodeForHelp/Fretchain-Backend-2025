@@ -24,6 +24,12 @@ public class DriverOfferController {
         return ok(offers.pendingFor(userDetails.getLoggedInDriver()), "record.list.fetched");
     }
 
+    /** One offer in any state: used when a notification is tapped (it may have expired or been taken). */
+    @GetMapping("/{uuid}")
+    public ResponseEntity<ResponseData> detail(@PathVariable String uuid) {
+        return ok(offers.detail(userDetails.getLoggedInDriver(), uuid), "record.fetched");
+    }
+
     /** Orders this driver accepted and has not finished. */
     @GetMapping("/current")
     public ResponseEntity<ResponseData> current() {

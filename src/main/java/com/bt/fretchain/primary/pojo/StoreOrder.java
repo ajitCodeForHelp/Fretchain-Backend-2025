@@ -109,6 +109,10 @@ public class StoreOrder extends BaseEntity {
     @Column(name = "driver_assigned_at")
     private java.time.LocalDateTime driverAssignedAt;
 
+    /** Last step the driver reported that the status does not show: ARRIVED_STORE or ARRIVED_CUSTOMER. */
+    @Column(name = "driver_step", length = 30)
+    private String driverStep;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<StoreOrderItem> items = new ArrayList<>();
 

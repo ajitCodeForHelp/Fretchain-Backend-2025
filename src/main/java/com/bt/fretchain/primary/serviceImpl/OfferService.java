@@ -43,6 +43,7 @@ public class OfferService {
     private final FreightOrderStatusLogRepository freightLogs;
     private final DispatchService dispatch;
     private final DriverNotificationService push;
+    private final OrderNotifier notifier;
 
     @PersistenceContext
     private EntityManager em;
@@ -161,6 +162,7 @@ public class OfferService {
             o.setDriver(driver);
             o.setOrderStatus(OrderStatus.ACCEPTED);
             freightLog(o, "Driver accepted: " + driver.getFullName(), OrderStatus.ACCEPTED);
+            notifier.freight(o, OrderStatus.ACCEPTED);
         } else {
             StoreOrder o = (StoreOrder) lockedOrder;
             if (o.getDriver() != null || !storeOpen(o)) {
@@ -170,6 +172,7 @@ public class OfferService {
             o.setDriver(driver);
             o.setDriverAssignedAt(LocalDateTime.now());
             storeLog(o, "Driver accepted: " + driver.getFullName(), driver.getFullName());
+            notifier.storeText(o, driver.getFullName() + " will deliver your order");
         }
         driver.setAvailable(false);
         a.setAssignmentStatus(DriverAssignmentStatus.ACCEPTED);
@@ -253,6 +256,17 @@ public class OfferService {
         return offers.findByDriverRecordIdAndAssignmentStatusAndExpiresAtAfterAndDeletedFalseOrderByAssignedAtDesc(
                         driver.getRecordId(), DriverAssignmentStatus.PENDING, LocalDateTime.now())
                 .stream().map(this::view).collect(Collectors.toList());
+    }
+
+    /** One offer of this driver, whatever its state now (used when a notification is tapped after it expired). */
+    @Transactional(readOnly = true)
+    public OfferDTO.View detail(Driver driver, String uuid) {
+        OrderDriverAssignment a = own(driver, uuid);
+        OfferDTO.View v = view(a);
+        if (a.getAssignmentStatus() == DriverAssignmentStatus.PENDING && v.getSecondsLeft() <= 0) {
+            v.setStatus(DriverAssignmentStatus.EXPIRED);
+        }
+        return v;
     }
 
     /** The orders this driver accepted and has not finished yet (newest first). */
@@ -421,6 +435,16 @@ public class OfferService {
             }
             v.setTripKm(o.getDistanceKm());
             v.setAmount(o.getTotalAmount());
+            if (o.getCustomer() != null) {
+                v.setCustomerName(o.getCustomer().getFullName());
+                v.setCustomerPhone(o.getCustomer().getMobile());
+            }
+            if (!o.getDropAddresses().isEmpty()) {
+                FreightOrderAddress last = o.getDropAddresses().get(o.getDropAddresses().size() - 1);
+                if (last.getContactName() != null) v.setCustomerName(last.getContactName());
+                if (last.getContactNumber() != null) v.setCustomerPhone(last.getContactNumber());
+            }
+            if (a.getAssignmentStatus() == DriverAssignmentStatus.ACCEPTED) DriverProgress.fill(v, o);
         } else {
             StoreOrder o = a.getStoreOrder();
             v.setOrderType(o.getStoreType() == StoreType.SHOP ? "SHOP" : "FOOD");
@@ -440,6 +464,9 @@ public class OfferService {
             v.setAmount(o.getTotalAmount());
             v.setItemCount(o.getItems() == null ? null : o.getItems().stream().mapToInt(i -> i.getQuantity() == null ? 1 : i.getQuantity()).sum());
             v.setPaymentMethod(o.getPaymentMethod() == null ? null : o.getPaymentMethod().name());
+            v.setCustomerName(o.getContactName());
+            v.setCustomerPhone(o.getContactMobile());
+            if (a.getAssignmentStatus() == DriverAssignmentStatus.ACCEPTED) DriverProgress.fill(v, o);
         }
         return v;
     }

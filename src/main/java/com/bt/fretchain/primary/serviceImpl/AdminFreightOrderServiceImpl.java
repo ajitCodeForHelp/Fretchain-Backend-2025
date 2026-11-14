@@ -59,6 +59,8 @@ public class AdminFreightOrderServiceImpl implements AdminFreightOrderService {
 
     private final OfferService offers;
 
+    private final OrderNotifier notifier;
+
     private final DispatchService dispatch;
     @Override
     @Transactional(readOnly = true)
@@ -165,6 +167,7 @@ public class AdminFreightOrderServiceImpl implements AdminFreightOrderService {
         log.setStatusTime(LocalDateTime.now());
 
         statusLogRepository.save(log);
+        notifier.freight(savedOrder, status);
     }
 
     private AdminFreightOrderDTO.ListResponse toListResponse(

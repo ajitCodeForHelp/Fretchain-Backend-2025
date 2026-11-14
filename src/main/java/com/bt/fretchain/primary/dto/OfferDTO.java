@@ -39,6 +39,33 @@ public class OfferDTO {
         private long secondsLeft;
         private String mode;
         private DriverAssignmentStatus status;
+
+        // ---- accepted orders: where the order is and what the driver does next
+        private String orderStatus;
+        private String statusLabel;
+        private String customerName;
+        private String customerPhone;
+        private java.util.List<Step> steps;
+        private NextStep next;
+    }
+
+    @Getter
+    @Setter
+    public static class Step {
+        private String key;
+        private String label;
+        private boolean done;
+        private boolean current;
+    }
+
+    /** The single button the driver can press now. enabled=false shows the hint instead (e.g. waiting for the store). */
+    @Getter
+    @Setter
+    public static class NextStep {
+        private String key;
+        private String label;
+        private boolean enabled = true;
+        private String hint;
     }
 
     @Getter

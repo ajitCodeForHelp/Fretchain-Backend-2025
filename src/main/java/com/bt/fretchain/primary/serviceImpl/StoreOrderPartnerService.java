@@ -42,6 +42,7 @@ public class StoreOrderPartnerService {
     private final DispatchService dispatch;
     private final DriverRepository driverRepository;
     private final OfferService offers;
+    private final OrderNotifier notifier;
 
     @Transactional(readOnly = true)
     public DataTableResponsePacket<Card> list(StoreType type, Long storeId, PartnerListRequest req, boolean canChangeStatus) {
@@ -321,6 +322,7 @@ public class StoreOrderPartnerService {
         }
         o.setModifiedBy(actorId);
         orderService.log(o, next, stops ? reason.trim() : null, actorName);
+        notifier.store(o, next, stops ? reason.trim() : null);
         if (stops) {
             orderService.releaseOrder(o);       // stock and coupon go back
         }
