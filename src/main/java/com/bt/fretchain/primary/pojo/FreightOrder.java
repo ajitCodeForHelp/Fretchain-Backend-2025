@@ -76,6 +76,10 @@ public class FreightOrder extends BaseEntity {
     )
     private List<FreightOrderAddress> dropAddresses = new ArrayList<>();
 
+    /** Which drop (0-based) the driver is delivering now; moves on after each drop is unloaded. */
+    @Column(name = "current_drop_index")
+    private Integer currentDropIndex = 0;
+
     @Column(name = "distance_km")
     private Double distanceKm;
 

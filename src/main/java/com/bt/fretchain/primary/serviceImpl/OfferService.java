@@ -44,6 +44,7 @@ public class OfferService {
     private final DispatchService dispatch;
     private final DriverNotificationService push;
     private final OrderNotifier notifier;
+    private final FreightOrderAddressRepository addresses;
 
     @PersistenceContext
     private EntityManager em;
@@ -386,6 +387,12 @@ public class OfferService {
         return new double[]{lat.doubleValue(), lng.doubleValue()};
     }
 
+    /** Drop points of a freight order, in delivery order (they are saved as address rows with the DROP role). */
+    List<FreightOrderAddress> dropsOf(FreightOrder o) {
+        return addresses.findByFreightOrderOrderBySequenceNoAsc(o).stream()
+                .filter(x -> x.getAddressRole() == AddressRole.DROP).collect(Collectors.toList());
+    }
+
     private void freightLog(FreightOrder o, String note, OrderStatus status) {
         FreightOrderStatusLog l = new FreightOrderStatusLog();
         l.setFreightOrder(o);
@@ -425,13 +432,30 @@ public class OfferService {
                 v.setPickupLat(p.getLatitude());
                 v.setPickupLng(p.getLongitude());
             }
-            if (o.getDropAddresses() != null && !o.getDropAddresses().isEmpty()) {
-                FreightOrderAddress d = o.getDropAddresses().get(o.getDropAddresses().size() - 1);
-                v.setDropName(d.getAddressName());
-                v.setDropAddress(d.getFullAddress());
-                v.setDropLat(d.getLatitude());
-                v.setDropLng(d.getLongitude());
-                v.setItemCount(o.getDropAddresses().size());
+            List<FreightOrderAddress> dropRows = dropsOf(o);
+            List<OfferDTO.Drop> drops = new ArrayList<>();
+            for (int i = 0; i < dropRows.size(); i++) {
+                FreightOrderAddress d = dropRows.get(i);
+                OfferDTO.Drop dd = new OfferDTO.Drop();
+                dd.setSequence(i + 1);
+                dd.setName(d.getAddressName());
+                dd.setAddress(d.getFullAddress());
+                dd.setLat(d.getLatitude());
+                dd.setLng(d.getLongitude());
+                dd.setContactName(d.getContactName());
+                dd.setContactPhone(d.getContactNumber());
+                drops.add(dd);
+            }
+            v.setDrops(drops);
+            if (!drops.isEmpty()) {
+                // headline drop = the one being delivered now (the first one until the driver moves on)
+                int k = Math.min(o.getCurrentDropIndex() == null ? 0 : o.getCurrentDropIndex(), drops.size() - 1);
+                OfferDTO.Drop cur = drops.get(k);
+                v.setDropName(drops.size() > 1 ? "Drop " + cur.getSequence() + " of " + drops.size() + (cur.getName() == null ? "" : " • " + cur.getName()) : cur.getName());
+                v.setDropAddress(cur.getAddress());
+                v.setDropLat(cur.getLat());
+                v.setDropLng(cur.getLng());
+                v.setItemCount(drops.size());
             }
             v.setTripKm(o.getDistanceKm());
             v.setAmount(o.getTotalAmount());
@@ -439,12 +463,12 @@ public class OfferService {
                 v.setCustomerName(o.getCustomer().getFullName());
                 v.setCustomerPhone(o.getCustomer().getMobile());
             }
-            if (!o.getDropAddresses().isEmpty()) {
-                FreightOrderAddress last = o.getDropAddresses().get(o.getDropAddresses().size() - 1);
-                if (last.getContactName() != null) v.setCustomerName(last.getContactName());
-                if (last.getContactNumber() != null) v.setCustomerPhone(last.getContactNumber());
+            if (!drops.isEmpty()) {
+                OfferDTO.Drop cur = drops.get(Math.min(o.getCurrentDropIndex() == null ? 0 : o.getCurrentDropIndex(), drops.size() - 1));
+                if (cur.getContactName() != null) v.setCustomerName(cur.getContactName());
+                if (cur.getContactPhone() != null) v.setCustomerPhone(cur.getContactPhone());
             }
-            if (a.getAssignmentStatus() == DriverAssignmentStatus.ACCEPTED) DriverProgress.fill(v, o);
+            if (a.getAssignmentStatus() == DriverAssignmentStatus.ACCEPTED) DriverProgress.fill(v, o, Math.max(drops.size(), 1));
         } else {
             StoreOrder o = a.getStoreOrder();
             v.setOrderType(o.getStoreType() == StoreType.SHOP ? "SHOP" : "FOOD");
@@ -466,6 +490,15 @@ public class OfferService {
             v.setPaymentMethod(o.getPaymentMethod() == null ? null : o.getPaymentMethod().name());
             v.setCustomerName(o.getContactName());
             v.setCustomerPhone(o.getContactMobile());
+            OfferDTO.Drop only = new OfferDTO.Drop();
+            only.setSequence(1);
+            only.setName(o.getContactName());
+            only.setAddress(o.getDeliveryAddress());
+            only.setLat(o.getDeliveryLatitude());
+            only.setLng(o.getDeliveryLongitude());
+            only.setContactName(o.getContactName());
+            only.setContactPhone(o.getContactMobile());
+            v.setDrops(List.of(only));
             if (a.getAssignmentStatus() == DriverAssignmentStatus.ACCEPTED) DriverProgress.fill(v, o);
         }
         return v;

@@ -26,6 +26,7 @@ public class DriverOrderService {
     private final FreightOrderRepository freightOrders;
     private final FreightOrderStatusLogRepository freightLogs;
     private final OfferService offers;
+    private final FreightOrderAddressRepository addressRepo;
     private final OrderNotifier notifier;
 
     /** Presses the driver's next button. `expectedStep` guards against a double tap / stale screen. */
@@ -113,9 +114,12 @@ public class DriverOrderService {
     // ---------------------------------------------------------------- freight
 
     private void advanceFreight(FreightOrder o, Driver driver, String expected) {
-        OrderStatus next = DriverProgress.freightNextStatus(o);
+        int drops = (int) addressRepo.findByFreightOrderOrderBySequenceNoAsc(o).stream().filter(x -> x.getAddressRole() == AddressRole.DROP).count();
+        drops = Math.max(drops, 1);
+        OrderStatus next = DriverProgress.freightNextStatus(o, drops);
         if (next == null) throw new BadRequestException("driver.order.finished");
         if (expected != null && !expected.equals(next.name())) throw new BadRequestException("driver.order.step.changed");
+        o.setCurrentDropIndex(DriverProgress.freightNextDrop(o, drops));
         o.setOrderStatus(next);
         o.setModifiedBy(driver.getRecordId());
         freightOrders.save(o);
@@ -123,7 +127,8 @@ public class DriverOrderService {
         FreightOrderStatusLog l = new FreightOrderStatusLog();
         l.setFreightOrder(o);
         l.setOrderStatus(next);
-        l.setRemarks("Driver: " + driver.getFullName());
+        l.setRemarks("Driver: " + driver.getFullName() + (drops > 1 && next.name().matches("IN_TRANSIT|DROP_ARRIVED|UNLOADING_.*")
+                ? " (drop " + (o.getCurrentDropIndex() + 1) + " of " + drops + ")" : ""));
         l.setStatusTime(LocalDateTime.now());
         freightLogs.save(l);
 

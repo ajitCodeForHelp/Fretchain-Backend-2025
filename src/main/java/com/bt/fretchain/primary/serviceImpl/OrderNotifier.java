@@ -24,6 +24,7 @@ public class OrderNotifier {
 
     private final CustomerNotificationRepository notifications;
     private final FirebaseMessaging firebase;
+    private final com.bt.fretchain.primary.repository.FreightOrderAddressRepository addressRepo;
 
     // ---------------------------------------------------------------- shop / food
 
@@ -53,16 +54,20 @@ public class OrderNotifier {
     public void freight(FreightOrder o, OrderStatus status) {
         Driver d = o.getDriver();
         String who = d == null ? "Your driver" : d.getFullName();
+        int drops = (int) addressRepo.findByFreightOrderOrderBySequenceNoAsc(o).stream()
+                .filter(x -> x.getAddressRole() == com.bt.fretchain.primary.pojo.enums.AddressRole.DROP).count();
+        int k = o.getCurrentDropIndex() == null ? 0 : o.getCurrentDropIndex();
+        String of = drops > 1 ? " (drop " + (k + 1) + " of " + drops + ")" : "";
         String body = switch (status) {
             case ACCEPTED -> who + (d != null && d.getVehicle() != null ? " (" + d.getVehicle().getVehicleNumber() + ")" : "") + " is assigned to your order";
             case PICKUP_STARTED -> who + " is on the way to the pickup";
             case PICKUP_ARRIVED -> who + " arrived at the pickup location";
             case LOADING_STARTED -> "Loading has started";
             case LOADING_COMPLETED -> "Loading is complete";
-            case IN_TRANSIT -> "Your goods are on the way";
-            case DROP_ARRIVED -> who + " arrived at the drop location";
-            case UNLOADING_STARTED -> "Unloading has started";
-            case UNLOADING_COMPLETED -> "Unloading is complete";
+            case IN_TRANSIT -> k > 0 ? "Your driver is on the way to the next drop" + of : "Your goods are on the way";
+            case DROP_ARRIVED -> who + " arrived at the drop location" + of;
+            case UNLOADING_STARTED -> "Unloading has started" + of;
+            case UNLOADING_COMPLETED -> "Unloading is complete" + of;
             case DELIVERED -> "Your order was delivered";
             case CANCELLED_BY_ADMIN, CANCELLED_BY_DRIVER -> "Your order was cancelled";
             default -> null;

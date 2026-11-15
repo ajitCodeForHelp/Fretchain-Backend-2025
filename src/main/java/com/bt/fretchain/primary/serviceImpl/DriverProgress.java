@@ -59,45 +59,83 @@ final class DriverProgress {
 
     // ---------------------------------------------------------------- freight
 
-    private static final OrderStatus[] FREIGHT_FLOW = {
-            OrderStatus.ACCEPTED, OrderStatus.PICKUP_STARTED, OrderStatus.PICKUP_ARRIVED, OrderStatus.LOADING_STARTED,
-            OrderStatus.LOADING_COMPLETED, OrderStatus.IN_TRANSIT, OrderStatus.DROP_ARRIVED, OrderStatus.UNLOADING_STARTED,
-            OrderStatus.UNLOADING_COMPLETED, OrderStatus.DELIVERED};
-    private static final String[] FREIGHT_LABEL = {
-            "Order accepted", "On the way to pickup", "At the pickup", "Loading", "Loaded", "In transit", "At the drop",
-            "Unloading", "Unloaded", "Delivered"};
-    private static final String[] FREIGHT_BUTTON = {
-            "Start trip to pickup", "I've arrived at the pickup", "Start loading", "Loading finished", "Start delivery trip",
-            "I've arrived at the drop", "Start unloading", "Unloading finished", "Complete delivery"};
+    /** One stop on the freight journey: the status it sets, how it reads, and the button that moves the driver into it. */
+    record Stage(OrderStatus status, String label, String button) {
+    }
 
-    static int freightPosition(FreightOrder o) {
-        for (int i = 0; i < FREIGHT_FLOW.length; i++) {
-            if (FREIGHT_FLOW[i] == o.getOrderStatus()) return i;
+    /**
+     * The journey for an order with `drops` drop points. The in-transit / arrived / unloading / unloaded cycle repeats
+     * for every drop; the order is delivered after the last one.
+     */
+    static List<Stage> freightPlan(int drops) {
+        int n = Math.max(drops, 1);
+        List<Stage> plan = new ArrayList<>();
+        plan.add(new Stage(OrderStatus.ACCEPTED, "Order accepted", null));
+        plan.add(new Stage(OrderStatus.PICKUP_STARTED, "On the way to pickup", "Start trip to pickup"));
+        plan.add(new Stage(OrderStatus.PICKUP_ARRIVED, "At the pickup", "I've arrived at the pickup"));
+        plan.add(new Stage(OrderStatus.LOADING_STARTED, "Loading", "Start loading"));
+        plan.add(new Stage(OrderStatus.LOADING_COMPLETED, "Loaded", "Loading finished"));
+        for (int k = 0; k < n; k++) {
+            String of = n > 1 ? " (drop " + (k + 1) + " of " + n + ")" : "";
+            String no = n > 1 ? " " + (k + 1) : "";
+            plan.add(new Stage(OrderStatus.IN_TRANSIT, "In transit" + of, k == 0 ? "Start delivery trip" : "Go to drop " + (k + 1)));
+            plan.add(new Stage(OrderStatus.DROP_ARRIVED, "At the drop" + of, "I've arrived at the drop" + no));
+            plan.add(new Stage(OrderStatus.UNLOADING_STARTED, "Unloading" + of, "Start unloading"));
+            plan.add(new Stage(OrderStatus.UNLOADING_COMPLETED, "Unloaded" + of, "Unloading finished"));
+        }
+        plan.add(new Stage(OrderStatus.DELIVERED, "Delivered", n > 1 ? "Complete delivery" : "Complete delivery"));
+        return plan;
+    }
+
+    /** Index in the plan, or -1 when the order is cancelled / not started. */
+    static int freightPosition(FreightOrder o, int drops) {
+        List<Stage> plan = freightPlan(drops);
+        OrderStatus st = o.getOrderStatus();
+        if (st == OrderStatus.DELIVERED) return plan.size() - 1;
+        for (int i = 0; i < 5; i++) {
+            if (plan.get(i).status() == st) return i;
+        }
+        int k = Math.min(o.getCurrentDropIndex() == null ? 0 : o.getCurrentDropIndex(), Math.max(drops, 1) - 1);
+        for (int j = 0; j < 4; j++) {
+            if (plan.get(5 + 4 * k + j).status() == st) return 5 + 4 * k + j;
         }
         return -1;
     }
 
-    static void fill(OfferDTO.View v, FreightOrder o) {
+    static void fill(OfferDTO.View v, FreightOrder o, int drops) {
         v.setOrderStatus(o.getOrderStatus().name());
-        int pos = freightPosition(o);
+        List<Stage> plan = freightPlan(drops);
+        int pos = freightPosition(o, drops);
         boolean ended = pos < 0;
         List<OfferDTO.Step> list = new ArrayList<>();
-        for (int i = 0; i < FREIGHT_FLOW.length; i++) {
+        for (int i = 0; i < plan.size(); i++) {
             OfferDTO.Step st = new OfferDTO.Step();
-            st.setKey(FREIGHT_FLOW[i].name());
-            st.setLabel(FREIGHT_LABEL[i]);
+            st.setKey(i + ":" + plan.get(i).status().name());
+            st.setLabel(plan.get(i).label());
             st.setDone(!ended && i <= pos);
             st.setCurrent(!ended && i == pos);
             list.add(st);
         }
         v.setSteps(list);
-        v.setStatusLabel(ended ? "Order cancelled" : FREIGHT_LABEL[pos]);
-        v.setNext(ended || pos >= FREIGHT_FLOW.length - 1 ? null : next(FREIGHT_FLOW[pos + 1].name(), FREIGHT_BUTTON[pos], true, null));
+        v.setCurrentDrop(o.getCurrentDropIndex() == null ? 0 : o.getCurrentDropIndex());
+        v.setStatusLabel(ended ? "Order cancelled" : plan.get(pos).label());
+        v.setNext(ended || pos >= plan.size() - 1 ? null : next(plan.get(pos + 1).status().name(), plan.get(pos + 1).button(), true, null));
     }
 
-    static OrderStatus freightNextStatus(FreightOrder o) {
-        int pos = freightPosition(o);
-        return pos < 0 || pos >= FREIGHT_FLOW.length - 1 ? null : FREIGHT_FLOW[pos + 1];
+    /** The status the order moves to when the driver presses the button, or null at the end. */
+    static OrderStatus freightNextStatus(FreightOrder o, int drops) {
+        List<Stage> plan = freightPlan(drops);
+        int pos = freightPosition(o, drops);
+        return pos < 0 || pos >= plan.size() - 1 ? null : plan.get(pos + 1).status();
+    }
+
+    /** The drop (0-based) the order will be on after the next press. */
+    static int freightNextDrop(FreightOrder o, int drops) {
+        List<Stage> plan = freightPlan(drops);
+        int pos = freightPosition(o, drops);
+        int next = pos + 1;
+        if (pos < 0 || next >= plan.size() - 1 || next < 5) return o.getCurrentDropIndex() == null ? 0 : o.getCurrentDropIndex();
+        return (next - 5) / 4;
     }
 
     // ---------------------------------------------------------------- helpers

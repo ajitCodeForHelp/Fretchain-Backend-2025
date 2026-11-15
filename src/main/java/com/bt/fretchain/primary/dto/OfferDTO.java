@@ -41,12 +41,27 @@ public class OfferDTO {
         private DriverAssignmentStatus status;
 
         // ---- accepted orders: where the order is and what the driver does next
+        /** Every drop point, in delivery order (freight can have several; shop / food has one). */
+        private java.util.List<Drop> drops;
+        private Integer currentDrop;
         private String orderStatus;
         private String statusLabel;
         private String customerName;
         private String customerPhone;
         private java.util.List<Step> steps;
         private NextStep next;
+    }
+
+    @Getter
+    @Setter
+    public static class Drop {
+        private int sequence;
+        private String name;
+        private String address;
+        private Double lat;
+        private Double lng;
+        private String contactName;
+        private String contactPhone;
     }
 
     @Getter
