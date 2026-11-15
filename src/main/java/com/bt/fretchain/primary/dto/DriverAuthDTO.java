@@ -99,6 +99,12 @@ public class DriverAuthDTO {
 
         private String vehicleNumber;
 
+        private Boolean vehicleVerified;
+
+        private String vehicleVerificationStatus;
+
+        private String vehicleVerificationReason;
+
         private String vehicleCategoryUuid;
 
         private String vehicleCategoryNameEn;

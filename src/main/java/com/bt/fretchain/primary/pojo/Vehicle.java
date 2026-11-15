@@ -28,6 +28,20 @@ public class Vehicle extends BaseEntity {
     @Column(name = "verified")
     private Boolean verified = false;
 
+    /** PENDING / VERIFIED / REJECTED, same review process as drivers. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "verification_status", length = 20)
+    private com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus verificationStatus;
+
+    @Column(name = "verification_reason", length = 500)
+    private String verificationReason;
+
+    @Column(name = "verification_changed_at")
+    private java.time.LocalDateTime verificationChangedAt;
+
+    @Column(name = "verification_reviewer", length = 120)
+    private String verificationReviewer;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "vehicle_category_id")
     private VehicleCategory vehicleCategory;
@@ -38,4 +52,33 @@ public class Vehicle extends BaseEntity {
 
     @OneToOne(mappedBy = "vehicle", fetch = FetchType.LAZY)
     private Driver driver;
+
+    public com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus getVerificationStatus() {
+        if (verificationStatus != null) {
+            return verificationStatus;
+        }
+        return Boolean.TRUE.equals(verified)
+                ? com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.VERIFIED
+                : com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.PENDING;
+    }
+
+    /** Keeps the boolean flag (used by dispatch) in step with the review status. */
+    public void review(com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus status, String reason, String reviewer) {
+        this.verificationStatus = status;
+        this.verified = status == com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.VERIFIED;
+        this.verificationReason = status == com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.REJECTED ? reason : null;
+        this.verificationChangedAt = java.time.LocalDateTime.now();
+        this.verificationReviewer = reviewer;
+    }
+
+    /** After a form save: the "verified" tick on the vehicle form still works and moves the review status with it. */
+    public void syncReviewWithFlag(String reviewer) {
+        if (Boolean.TRUE.equals(verified)) {
+            if (verificationStatus != com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.VERIFIED) {
+                review(com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.VERIFIED, null, reviewer);
+            }
+        } else if (verificationStatus == null || verificationStatus == com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.VERIFIED) {
+            review(com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.PENDING, null, null);
+        }
+    }
 }

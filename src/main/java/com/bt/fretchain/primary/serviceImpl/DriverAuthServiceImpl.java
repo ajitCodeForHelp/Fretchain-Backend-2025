@@ -345,6 +345,10 @@ public class DriverAuthServiceImpl
                     driver.getVehicle().getVehicleNumber()
             );
 
+            response.setVehicleVerified(driver.getVehicle().getVerified());
+            response.setVehicleVerificationStatus(driver.getVehicle().getVerificationStatus().name());
+            response.setVehicleVerificationReason(driver.getVehicle().getVerificationReason());
+
             if (driver.getVehicle()
                     .getVehicleCategory() != null) {
 

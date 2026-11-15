@@ -60,7 +60,17 @@ public class VendorFleetService {
         VehicleDTO.Detail existing = ownVehicle(vendor, uuid);
         req.setVendorUuid(vendor);
         req.setVerified(existing.getVerified());
-        return vehicleService.update(uuid, req, user);
+        vehicleService.update(uuid, req, user);
+        // a corrected rejected vehicle goes back for a new review
+        vehicleService.resubmitIfRejected(uuid);
+        return vehicleService.getById(uuid);
+    }
+
+    @Transactional
+    public VehicleDTO.Detail reviewVehicle(SystemUser user, String uuid, VehicleDTO.Review req) {
+        String vendor = writeVendorUuid(user);
+        ownVehicle(vendor, uuid);
+        return vehicleService.review(uuid, req.getStatus(), req.getReason(), user);
     }
 
     @Transactional

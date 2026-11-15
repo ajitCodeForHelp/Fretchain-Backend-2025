@@ -45,6 +45,7 @@ public class VehicleServiceImpl implements VehicleService {
         Vehicle entity = vehicleMapper.toEntity(request);
 
         setRelations(entity, request);
+        entity.syncReviewWithFlag(user.getFullName());
 
         entity.setCreatedBy(user.getRecordId());
         entity.setModifiedBy(user.getRecordId());
@@ -69,10 +70,38 @@ public class VehicleServiceImpl implements VehicleService {
         vehicleMapper.updateEntityFromDto(request, entity);
 
         setRelations(entity, request);
+        entity.syncReviewWithFlag(user.getFullName());
 
         entity.setModifiedBy(user.getRecordId());
 
         return vehicleMapper.toDetailDto(vehicleRepository.save(entity));
+    }
+
+    @Override
+    public VehicleDTO.Detail review(String uuid, com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus status,
+                                    String reason, SystemUser user) {
+        Vehicle entity = vehicleRepository.findByUuidAndDeletedFalse(uuid)
+                .orElseThrow(() -> new ResourceNotFoundException("record.notfound"));
+        if (status == null) {
+            throw new com.bt.fretchain.exception.BadRequestException("driver.review.status.required");
+        }
+        String why = reason == null ? null : reason.trim();
+        if (status == com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.REJECTED && (why == null || why.isEmpty())) {
+            throw new com.bt.fretchain.exception.BadRequestException("vehicle.review.reason.required");
+        }
+        entity.review(status, why, user == null ? null : user.getFullName());
+        entity.setModifiedBy(user == null ? null : user.getRecordId());
+        return vehicleMapper.toDetailDto(vehicleRepository.save(entity));
+    }
+
+    @Override
+    public void resubmitIfRejected(String uuid) {
+        vehicleRepository.findByUuidAndDeletedFalse(uuid).ifPresent(v -> {
+            if (v.getVerificationStatus() == com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.REJECTED) {
+                v.review(com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.PENDING, null, null);
+                vehicleRepository.save(v);
+            }
+        });
     }
 
     @Override
@@ -241,6 +270,19 @@ public class VehicleServiceImpl implements VehicleService {
                     predicates.add(
                             cb.equal(root.get("verified"), request.getFilters().getVerified())
                     );
+                }
+
+                if (request.getFilters().getVerificationStatus() != null) {
+                    var st = request.getFilters().getVerificationStatus();
+                    if (st == com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.REJECTED) {
+                        predicates.add(cb.equal(root.get("verificationStatus"), st));
+                    } else if (st == com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus.VERIFIED) {
+                        predicates.add(cb.equal(root.get("verified"), true));
+                    } else {
+                        predicates.add(cb.equal(root.get("verified"), false));
+                        predicates.add(cb.or(cb.isNull(root.get("verificationStatus")),
+                                cb.equal(root.get("verificationStatus"), st)));
+                    }
                 }
 
                 if (request.getFilters().getVehicleCategoryUuid() != null

@@ -83,6 +83,12 @@ public class VendorPanelController extends _BaseController {
         return ok(null, "status.updated");
     }
 
+    /** The fleet owner approves / rejects (reason required) one of their own vehicles. */
+    @PatchMapping("/partner/api/vendor-vehicle/{uuid}/review")
+    public ResponseEntity<ResponseData> reviewVehicle(@PathVariable String uuid, @Valid @RequestBody VehicleDTO.Review req) {
+        return ok(fleet.reviewVehicle(getLoggedInUser(), uuid, req), "status.updated");
+    }
+
     // ---- drivers
     @PostMapping("/partner/api/vendor-driver/list")
     public ResponseEntity<ResponseData> drivers(@RequestBody DriverDTO.ListOrSearchData req) {

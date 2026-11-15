@@ -51,6 +51,14 @@ public class VehicleDTO {
 
         private Boolean verified;
 
+        private com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus verificationStatus;
+
+        private String verificationReason;
+
+        private java.time.LocalDateTime verificationChangedAt;
+
+        private String verificationReviewer;
+
         private VehicleCategoryDTO.Basic vehicleCategory;
 
         private String vendorUuid;
@@ -88,6 +96,8 @@ public class VehicleDTO {
     public static class Filters {
         private Boolean active;
         private Boolean verified;
+        /** PENDING / VERIFIED / REJECTED */
+        private com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus verificationStatus;
         private String vehicleCategoryUuid;
         private String vendorUuid;
     }
@@ -104,5 +114,17 @@ public class VehicleDTO {
     public static class SortRequest {
         private String field;
         private String direction;
+    }
+
+    /** Approve / reject (reason required) / send back to pending. */
+    @Getter
+    @Setter
+    public static class Review {
+
+        @jakarta.validation.constraints.NotNull(message = "Status is required")
+        private com.bt.fretchain.primary.pojo.enums.DriverVerificationStatus status;
+
+        @jakarta.validation.constraints.Size(max = 500, message = "Reason is too long")
+        private String reason;
     }
 }

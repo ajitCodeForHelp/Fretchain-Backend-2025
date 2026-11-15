@@ -104,6 +104,17 @@ public class VehicleController extends _BaseController {
         );
     }
 
+    /** Approve / reject (reason required) a vehicle, or send it back to pending (needs VEHICLE_STATUS). */
+    @PatchMapping("/{uuid}/review")
+    public ResponseEntity<ResponseData> review(
+            @PathVariable String uuid,
+            @jakarta.validation.Valid @RequestBody VehicleDTO.Review req
+    ) {
+        return ResponseEntity.ok(ResponseData.builder()
+                .statusCode(200).message("status.updated")
+                .data(vehicleService.review(uuid, req.getStatus(), req.getReason(), getLoggedInUser())).build());
+    }
+
     @GetMapping("/list-in-key-value")
     public ResponseEntity<ResponseData> listInKeyValue(
             @RequestParam(required = false) String vendorUuid

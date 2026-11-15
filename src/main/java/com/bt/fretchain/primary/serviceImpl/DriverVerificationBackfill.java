@@ -22,6 +22,12 @@ public class DriverVerificationBackfill implements ApplicationRunner {
         int n = em.createNativeQuery(
                 "update drivers set verification_status = case when verified = 1 then 'VERIFIED' else 'PENDING' end "
                         + "where verification_status is null").executeUpdate();
+        int v = em.createNativeQuery(
+                "update vehicles set verification_status = case when verified = 1 then 'VERIFIED' else 'PENDING' end "
+                        + "where verification_status is null").executeUpdate();
+        if (v > 0) {
+            log.info("Vehicle verification status set for {} existing vehicles", v);
+        }
         if (n > 0) {
             log.info("Driver verification status set for {} existing drivers", n);
         }
