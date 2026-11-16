@@ -39,6 +39,8 @@ import java.util.stream.Collectors;
 public class OfferService {
 
     private final OrderDriverAssignmentRepository offers;
+    private final OrderInfoBuilder info;
+    private final ProofService proofService;
     private final DriverRepository drivers;
     private final FreightOrderStatusLogRepository freightLogs;
     private final DispatchService dispatch;
@@ -431,6 +433,8 @@ public class OfferService {
                 v.setPickupAddress(p.getFullAddress());
                 v.setPickupLat(p.getLatitude());
                 v.setPickupLng(p.getLongitude());
+                v.setPickupContactName(p.getContactName());
+                v.setPickupContactPhone(p.getContactNumber());
             }
             List<FreightOrderAddress> dropRows = dropsOf(o);
             List<OfferDTO.Drop> drops = new ArrayList<>();
@@ -468,7 +472,19 @@ public class OfferService {
                 if (cur.getContactName() != null) v.setCustomerName(cur.getContactName());
                 if (cur.getContactPhone() != null) v.setCustomerPhone(cur.getContactPhone());
             }
-            if (a.getAssignmentStatus() == DriverAssignmentStatus.ACCEPTED) DriverProgress.fill(v, o, Math.max(drops.size(), 1));
+            info.fill(v, o);
+            if (a.getAssignmentStatus() == DriverAssignmentStatus.ACCEPTED) {
+                DriverProgress.fill(v, o, Math.max(drops.size(), 1));
+                // pickup / drop records the next button depends on
+                DriverProgress.ProofNeed need = DriverProgress.freightProofNeed(o, Math.max(drops.size(), 1));
+                v.setProof(proofService.requirement(o, need));
+                if (v.getProof() != null && !v.getProof().isComplete() && v.getNext() != null) {
+                    v.getNext().setEnabled(false);
+                    v.getNext().setHint(need.stage() == com.bt.fretchain.primary.pojo.enums.ProofStage.PICKUP
+                            ? "Record the goods check, photos and the customer's signature first"
+                            : "Record the delivery photos and the receiver's signature first");
+                }
+            }
         } else {
             StoreOrder o = a.getStoreOrder();
             v.setOrderType(o.getStoreType() == StoreType.SHOP ? "SHOP" : "FOOD");
@@ -499,6 +515,7 @@ public class OfferService {
             only.setContactName(o.getContactName());
             only.setContactPhone(o.getContactMobile());
             v.setDrops(List.of(only));
+            info.fill(v, o);
             if (a.getAssignmentStatus() == DriverAssignmentStatus.ACCEPTED) DriverProgress.fill(v, o);
         }
         return v;

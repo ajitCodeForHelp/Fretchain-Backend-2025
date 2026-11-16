@@ -5,6 +5,7 @@ import com.bt.fretchain.primary.controller._BaseController;
 import com.bt.fretchain.primary.dto.DriverDTO;
 import com.bt.fretchain.primary.dto.VehicleDTO;
 import com.bt.fretchain.primary.dto.VendorDTO;
+import com.bt.fretchain.primary.serviceImpl.LiveTrackingService;
 import com.bt.fretchain.primary.serviceImpl.VendorFleetService;
 import com.bt.fretchain.primary.serviceImpl.VendorService;
 import jakarta.validation.Valid;
@@ -22,6 +23,7 @@ public class VendorPanelController extends _BaseController {
 
     private final VendorService vendorService;
     private final VendorFleetService fleet;
+    private final LiveTrackingService liveTracking;
 
     // ---- company profile
     @GetMapping("/partner/api/vendor-profile/me")
@@ -98,6 +100,12 @@ public class VendorPanelController extends _BaseController {
     @GetMapping("/partner/api/vendor-driver/list-in-key-value")
     public ResponseEntity<ResponseData> driverKeyValue() {
         return ok(fleet.driverKeyValue(getLoggedInUser()), "record.dropdown.fetched");
+    }
+
+    /** Live map of this fleet owner's own drivers only. */
+    @GetMapping("/partner/api/vendor-driver/live")
+    public ResponseEntity<ResponseData> liveDrivers(@RequestParam(required = false) String state, @RequestParam(required = false) String search) {
+        return ok(liveTracking.drivers(getLoggedInUser().getRecordId(), state, search), "record.list.fetched");
     }
 
     @GetMapping("/partner/api/vendor-driver/{uuid}")

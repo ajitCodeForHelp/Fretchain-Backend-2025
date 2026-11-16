@@ -140,6 +140,9 @@ public class AdminFreightOrderDTO {
         /** Staff can offer / change the driver now. */
         private Boolean canAssignDriver = false;
 
+        /** What the driver recorded at the pickup and at each drop: goods check, photos, signature. */
+        private java.util.List<ProofDTO.View> proofs = new java.util.ArrayList<>();
+
         private String orderUuid;
 
         private String orderNumber;

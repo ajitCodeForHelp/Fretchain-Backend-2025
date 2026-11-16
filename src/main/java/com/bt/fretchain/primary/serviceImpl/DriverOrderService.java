@@ -28,6 +28,7 @@ public class DriverOrderService {
     private final OfferService offers;
     private final FreightOrderAddressRepository addressRepo;
     private final OrderNotifier notifier;
+    private final ProofService proofService;
 
     /** Presses the driver's next button. `expectedStep` guards against a double tap / stale screen. */
     @Transactional
@@ -119,6 +120,8 @@ public class DriverOrderService {
         OrderStatus next = DriverProgress.freightNextStatus(o, drops);
         if (next == null) throw new BadRequestException("driver.order.finished");
         if (expected != null && !expected.equals(next.name())) throw new BadRequestException("driver.order.step.changed");
+        // loading / unloading cannot be finished until the goods check, photos and signature are saved
+        proofService.assertReady(o, DriverProgress.freightProofNeed(o, drops));
         o.setCurrentDropIndex(DriverProgress.freightNextDrop(o, drops));
         o.setOrderStatus(next);
         o.setModifiedBy(driver.getRecordId());

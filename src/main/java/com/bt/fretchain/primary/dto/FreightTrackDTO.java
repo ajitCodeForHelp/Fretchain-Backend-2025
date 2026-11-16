@@ -91,6 +91,12 @@ public class FreightTrackDTO {
         private List<Event> timeline = new ArrayList<>();
         /** The customer can still cancel (no driver on the way yet). */
         private boolean cancellable;
+        /** Where the driver is now (only while the order is on the road) and when that was reported. */
+        private Double driverLat;
+        private Double driverLng;
+        private java.time.LocalDateTime driverLocationAt;
+        /** Pickup and delivery records (photos, condition, who signed); the signature drawing itself is not sent. */
+        private List<ProofDTO.View> proofs = new ArrayList<>();
     }
 
     @Getter

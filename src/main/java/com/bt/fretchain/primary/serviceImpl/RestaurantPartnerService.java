@@ -91,6 +91,7 @@ public class RestaurantPartnerService {
         restaurant.setOpeningTime(req.getOpeningTime());
         restaurant.setClosingTime(req.getClosingTime());
         restaurant.setAcceptingOrders(req.getAcceptingOrders() == null || req.getAcceptingOrders());
+        if (req.getAutoAcceptOrders() != null) restaurant.setAutoAcceptOrders(req.getAutoAcceptOrders());
         restaurant.setAvgPreparationMinutes(req.getAvgPreparationMinutes());
         restaurant.setMinOrderAmount(req.getMinOrderAmount());
         restaurant.setDeliveryFee(req.getDeliveryFee());

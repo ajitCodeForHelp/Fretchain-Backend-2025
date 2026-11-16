@@ -69,6 +69,7 @@ public class ShopMasterDTO {
         private LocalTime openingTime;
         private LocalTime closingTime;
         private Boolean acceptingOrders;
+        private Boolean autoAcceptOrders;
 
         @Min(0)
         private Integer avgPreparationMinutes;
@@ -131,6 +132,7 @@ public class ShopMasterDTO {
         private LocalTime openingTime;
         private LocalTime closingTime;
         private Boolean acceptingOrders;
+        private Boolean autoAcceptOrders;
         private Integer avgPreparationMinutes;
         private BigDecimal minOrderAmount;
         private BigDecimal deliveryFee;

@@ -7,6 +7,7 @@ import com.bt.fretchain.primary.controller._BaseController;
 import com.bt.fretchain.primary.dto.DriverDTO;
 import com.bt.fretchain.primary.pojo.SystemUser;
 import com.bt.fretchain.primary.service.DriverService;
+import com.bt.fretchain.primary.serviceImpl.LiveTrackingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +21,14 @@ import java.util.List;
 public class DriverController extends _BaseController {
 
     private final DriverService driverService;
+    private final LiveTrackingService liveTracking;
+
+    /** Live map: every driver with position, state and current order. state = ON_ORDER | ONLINE | OFFLINE. */
+    @GetMapping("/live")
+    public ResponseEntity<ResponseData> live(@RequestParam(required = false) String state, @RequestParam(required = false) String search) {
+        return ResponseEntity.ok(ResponseData.builder().statusCode(200).message("record.list.fetched")
+                .data(liveTracking.drivers(null, state, search)).build());
+    }
 
     @PostMapping("/save")
     public ResponseEntity<ResponseData> save(

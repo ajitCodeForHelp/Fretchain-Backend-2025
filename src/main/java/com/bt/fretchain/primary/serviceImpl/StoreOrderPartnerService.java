@@ -289,6 +289,27 @@ public class StoreOrderPartnerService {
         return d;
     }
 
+    /**
+     * Called right after a customer places an order: when the shop / restaurant is set to accept orders
+     * automatically the order is accepted at once, exactly as if the store had pressed Accept (same status log,
+     * same push and notification to the customer, and the driver search starts in AUTO mode).
+     */
+    @Transactional
+    public Detail autoAcceptIfEnabled(String orderUuid) {
+        StoreOrder o = orderRepository.findByUuidAndDeletedFalse(orderUuid).orElse(null);
+        if (o == null) return null;
+        boolean auto = o.getStoreType() == StoreType.SHOP
+                ? o.getShop() != null && Boolean.TRUE.equals(o.getShop().getAutoAcceptOrders())
+                : o.getRestaurant() != null && Boolean.TRUE.equals(o.getRestaurant().getAutoAcceptOrders());
+        if (auto && o.getStatus() == StoreOrderStatus.PLACED) {
+            applyStatus(o, StoreOrderStatus.ACCEPTED, null, o.getModifiedBy(), "System (auto accept)");
+            orderRepository.save(o);
+        }
+        Detail d = orderService.toDetail(o);
+        d.setNextStatuses(new ArrayList<>());
+        return d;
+    }
+
     /** Counts per status for the tabs, plus today's figures. */
     @Transactional(readOnly = true)
     public Summary summary(StoreType type, Long storeId) {

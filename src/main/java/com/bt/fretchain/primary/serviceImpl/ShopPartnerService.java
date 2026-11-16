@@ -91,6 +91,7 @@ public class ShopPartnerService {
         shop.setOpeningTime(req.getOpeningTime());
         shop.setClosingTime(req.getClosingTime());
         shop.setAcceptingOrders(req.getAcceptingOrders() == null || req.getAcceptingOrders());
+        if (req.getAutoAcceptOrders() != null) shop.setAutoAcceptOrders(req.getAutoAcceptOrders());
         shop.setAvgPreparationMinutes(req.getAvgPreparationMinutes());
         shop.setMinOrderAmount(req.getMinOrderAmount());
         shop.setDeliveryFee(req.getDeliveryFee());

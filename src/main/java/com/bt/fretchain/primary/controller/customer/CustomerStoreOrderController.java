@@ -3,6 +3,7 @@ package com.bt.fretchain.primary.controller.customer;
 import com.bt.fretchain.bean.ResponseData;
 import com.bt.fretchain.primary.controller._BaseController;
 import com.bt.fretchain.primary.dto.StoreOrderDTO;
+import com.bt.fretchain.primary.serviceImpl.StoreOrderPartnerService;
 import com.bt.fretchain.primary.serviceImpl.StoreOrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 public class CustomerStoreOrderController extends _BaseController {
 
     private final StoreOrderService service;
+    private final StoreOrderPartnerService partnerService;
 
     /** Price the cart: lines, fees, coupon discount, delivery time and any problems to fix. */
     @PostMapping("/quote")
@@ -33,7 +35,10 @@ public class CustomerStoreOrderController extends _BaseController {
 
     @PostMapping("/place")
     public ResponseEntity<ResponseData> place(@Valid @RequestBody StoreOrderDTO.PlaceRequest request) {
-        return ok(service.place(request, getLoggedInUser()), "storeorder.placed");
+        StoreOrderDTO.Detail placed = service.place(request, getLoggedInUser());
+        // shops / restaurants set to "auto accept" take the order straight away
+        StoreOrderDTO.Detail accepted = partnerService.autoAcceptIfEnabled(placed.getUuid());
+        return ok(accepted != null ? accepted : placed, "storeorder.placed");
     }
 
     @PostMapping("/list")

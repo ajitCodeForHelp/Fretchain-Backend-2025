@@ -62,6 +62,8 @@ public class AdminFreightOrderServiceImpl implements AdminFreightOrderService {
     private final OrderNotifier notifier;
 
     private final DispatchService dispatch;
+
+    private final ProofService proofService;
     @Override
     @Transactional(readOnly = true)
     public DataTableResponsePacket<AdminFreightOrderDTO.ListResponse> getListData(
@@ -117,6 +119,7 @@ public class AdminFreightOrderServiceImpl implements AdminFreightOrderService {
         mapOrderTypeDetail(order, response);
         mapStatusLogs(order, response);
         mapDriverDetail(order, response);
+        response.setProofs(proofService.forOrder(order));
 
         return response;
     }

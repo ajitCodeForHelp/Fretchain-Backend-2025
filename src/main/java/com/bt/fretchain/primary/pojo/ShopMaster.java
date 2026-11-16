@@ -110,6 +110,10 @@ public class ShopMaster extends BaseEntity {
     @Column(name = "accepting_orders")
     private Boolean acceptingOrders = true;
 
+    /** true: new orders are accepted at once (customer is notified like a manual accept); false: the store accepts by hand. */
+    @Column(name = "auto_accept_orders")
+    private Boolean autoAcceptOrders = false;
+
     /** Average order preparation / packing time in minutes. */
     @Column(name = "avg_preparation_minutes")
     private Integer avgPreparationMinutes;

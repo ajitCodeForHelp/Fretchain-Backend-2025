@@ -24,6 +24,9 @@ public class OfferDTO {
         private String pickupAddress;
         private Double pickupLat;
         private Double pickupLng;
+        /** Who to ask for at the pickup (freight). */
+        private String pickupContactName;
+        private String pickupContactPhone;
         private String dropName;
         private String dropAddress;
         private Double dropLat;
@@ -50,6 +53,71 @@ public class OfferDTO {
         private String customerPhone;
         private java.util.List<Step> steps;
         private NextStep next;
+
+        // ---- everything the driver needs to know about the order, grouped by topic (differs per order type)
+        private java.util.List<Section> sections;
+        /** Note the customer left for the driver. */
+        private String instructions;
+        /** Cash the driver must collect on delivery (cash-on-delivery shop / food order, COD parcel), else null. */
+        private BigDecimal cashToCollect;
+        private Boolean paymentPaid;
+        /** Freight only: what the driver must record at the step he is on (checks, photos, signature). */
+        private ProofRequirement proof;
+    }
+
+    /** One block of the order detail screen: label / value rows and / or a list of items. */
+    @Getter
+    @Setter
+    public static class Section {
+        private String key;
+        private String title;
+        private java.util.List<Row> rows = new java.util.ArrayList<>();
+        private java.util.List<Item> items = new java.util.ArrayList<>();
+    }
+
+    @Getter
+    @Setter
+    public static class Row {
+        private String label;
+        private String value;
+        /** true = shown highlighted (dangerous goods, fragile, cash to collect ...). */
+        private boolean flag;
+
+        public Row() { }
+
+        public Row(String label, String value, boolean flag) {
+            this.label = label;
+            this.value = value;
+            this.flag = flag;
+        }
+    }
+
+    @Getter
+    @Setter
+    public static class Item {
+        private String name;
+        private Integer quantity;
+        private String note;
+        private String imageUrl;
+        /** A document or file the driver can open. */
+        private String url;
+    }
+
+    /** What the driver has to record before the next step is allowed (freight orders). */
+    @Getter
+    @Setter
+    public static class ProofRequirement {
+        /** PICKUP or DROP. */
+        private String stage;
+        private Integer dropSequence;
+        /** The goods check (description, quantity, condition) is needed at this stage. */
+        private boolean needsChecklist;
+        private int minPhotos;
+        private boolean needsSignature;
+        /** true once everything required has been saved. */
+        private boolean complete;
+        /** What is already saved, so the app can show it. */
+        private ProofDTO.View saved;
     }
 
     @Getter

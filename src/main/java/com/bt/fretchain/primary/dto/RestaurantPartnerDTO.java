@@ -85,6 +85,7 @@ public class RestaurantPartnerDTO {
         private LocalTime openingTime;
         private LocalTime closingTime;
         private Boolean acceptingOrders;
+        private Boolean autoAcceptOrders;
 
         @Min(0)
         private Integer avgPreparationMinutes;

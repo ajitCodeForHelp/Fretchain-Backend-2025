@@ -138,6 +138,21 @@ final class DriverProgress {
         return (next - 5) / 4;
     }
 
+    /** A proof the driver must have saved before the next button works. */
+    record ProofNeed(com.bt.fretchain.primary.pojo.enums.ProofStage stage, int dropSequence) {
+    }
+
+    /**
+     * Pressing "Loading finished" needs the pickup record (goods check, photos, sender's signature); pressing
+     * "Unloading finished" needs that drop's record (condition, photos, receiver's signature).
+     */
+    static ProofNeed freightProofNeed(FreightOrder o, int drops) {
+        OrderStatus next = freightNextStatus(o, drops);
+        if (next == OrderStatus.LOADING_COMPLETED) return new ProofNeed(com.bt.fretchain.primary.pojo.enums.ProofStage.PICKUP, 0);
+        if (next == OrderStatus.UNLOADING_COMPLETED) return new ProofNeed(com.bt.fretchain.primary.pojo.enums.ProofStage.DROP, freightNextDrop(o, drops) + 1);
+        return null;
+    }
+
     // ---------------------------------------------------------------- helpers
 
     private static List<OfferDTO.Step> steps(String[][] def, int pos) {

@@ -44,6 +44,7 @@ public class CustomerFreightTrackService {
     private final FreightOrderStatusLogRepository logs;
     private final OfferService offers;
     private final OrderNotifier notifier;
+    private final ProofService proofService;
 
     @Transactional(readOnly = true)
     public DataTableResponsePacket<Card> list(ListRequest req, SystemUser customer) {
@@ -92,6 +93,17 @@ public class CustomerFreightTrackService {
             t.getTimeline().add(e);
         }
         t.setCancellable(o.getDriver() == null && (o.getOrderStatus() == OrderStatus.PLACED || o.getOrderStatus() == OrderStatus.DRIVER_REQUESTED));
+        // the driver's position is shared with the customer only while the order is on the road
+        if (o.getDriver() != null && o.getOrderStatus() != OrderStatus.DELIVERED && o.getDriver().getCurrentLat() != null
+                && o.getOrderStatus().ordinal() >= OrderStatus.PICKUP_STARTED.ordinal()) {
+            t.setDriverLat(o.getDriver().getCurrentLat());
+            t.setDriverLng(o.getDriver().getCurrentLng());
+            t.setDriverLocationAt(o.getDriver().getLastLocationUpdatedAt());
+        }
+        for (var pv : proofService.forOrder(o)) {
+            pv.setSignatureSvg(null);
+            t.getProofs().add(pv);
+        }
         return t;
     }
 
